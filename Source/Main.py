@@ -5,6 +5,22 @@ import json
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 
+def valid_vm(text, cfg, uid):
+    if uid in cfg["admin_ids"]:
+        return True
+    if text == cfg["white_list"][uid]:
+        return True
+    return False
+
+def valid_channel(cfg, command):
+    if cfg["channel_id"] == command["channel_id"]:
+        return True
+    return False
+
+def is_valid(text, cfg, uid, command):
+    if valid_vm(text, cfg, uid) and valid_channel(cfg, command):
+        return True
+    return False
 
 def setup_state():
     try:
@@ -13,6 +29,8 @@ def setup_state():
     except FileNotFoundError:
         with open('config.json', 'w') as config_file:
             template = {
+                        "vm_names": ["ADD HERE"],
+                        "resource_group": "ADD HERE",
                         "slack_api_key": "ENTER YOUR API KEY HERE",
                         "slack_signing_secret": "ENTER YOUR SIGNING SECRET HERE",
                         "azure_tenant_id": "ENTER YOUR TENANT ID HERE",
@@ -21,8 +39,7 @@ def setup_state():
                         "azure_subscription_id": "ENTER YOUR SUBSCRIPTION ID HERE",
                         "admin_ids": ["ENTER YOUR ADMIN IDS HERE"],
                         "admin_commands": ["add", "remove", "start", "stop", "view"],
-                        "white_list": ["ENTER WHITELIST HERE"],
-                        "*": ["add", "remove", "view"],
+                        "white_list": {"ENTER WHITELIST HERE"},
                         "channel_id": "ENTER YOUR CHANNEL ID HERE",
                         "socket_id": "ENTER SOCKET ID"
                     }
@@ -33,17 +50,35 @@ def build_app(cfg):
         token=cfg['slack_api_key'],
         signing_secret=cfg['slack_signing_secret'],
     )
-
+    cred = ClientSecretCredential(
+        tenant_id=cfg["azure_tenant_id"],
+        client_id=cfg["azure_client_id"],
+        client_secret=cfg["azure_client_secret"]
+    )
+    compute = ComputeManagementClient(cred, cfg["azure_subscription_id"])
     @app.command("/startvm")
     def start_command(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
-        if not text:
-            respond(respond("why you messaging then ;-;"))
-        elif text.lower() == "help":
-            respond(respond("im a bot bro find a human to help u"))
+        if text.lower() == "help":
+            respond(respond("Contact VM admins for support."))
+        elif is_valid(text, cfg, command["user_id"], command):
+            poller = compute.virtual_machines.begin_start(cfg["resource_group"], text)
+            respond(respond(f"VM started: {poller.result}"))
         else:
-            respond(respond("i dont speak gibbrish"))
+            respond(respond("Invalid input."))
+
+    @app.command("/stopvm")
+    def stop_command(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if text.lower() == "help":
+            respond(respond("Contact VM admins for support."))
+        elif is_valid(text, cfg, command["user_id"], command):
+            poller = compute.virtual_machines.begin_deallocate(cfg["resource_group"], text)
+            respond(respond(f"VM stopped: {poller.result()}"))
+        else:
+            respond(respond("Invalid input."))
     return app
 
 
