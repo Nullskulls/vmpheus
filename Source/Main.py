@@ -82,7 +82,7 @@ def setup_state():
             pass
     except FileNotFoundError:
         with open('logs.txt', 'w') as log_file:
-            pass
+            log_file.write("")
     try:
         with open('requests.json', 'r') as requests_file:
             pass
@@ -107,28 +107,28 @@ def build_app(cfg):
         ack()
         text = (command.get("text") or "").strip()
         if text.lower() == "help":
-            respond(respond("Contact VM admins for support."))
+            respond("Contact VM admins for support.")
         elif is_valid(text, cfg, command["user_id"], command):
-            respond(respond("Starting this bad boy..."))
+            respond("Starting this bad boy...")
             poller = compute.virtual_machines.begin_start(cfg["resource_group"], text)
             log_actions("StartVM", command)
-            respond(respond("VM started."))
+            respond("VM started.")
         else:
-            respond(respond("Invalid input."))
+            respond("Invalid input.")
 
     @app.command("/stopvm")
     def stop_command(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
         if text.lower() == "help":
-            respond(respond("Contact VM admins for support."))
+            respond("Contact VM admins for support.")
         elif is_valid(text, cfg, command["user_id"], command):
-            respond(respond(f"Sopping this good boy..."))
+            respond(f"Sopping this good boy...")
             poller = compute.virtual_machines.begin_deallocate(cfg["resource_group"], text)
             log_actions("StopVM", command)
-            respond(respond("VM stopped."))
+            respond("VM stopped.")
         else:
-            respond(respond("Invalid input."))
+            respond("Invalid input.")
 
     @app.command("/addvm")
     def add_vm(ack, respond, command):
@@ -140,7 +140,7 @@ def build_app(cfg):
             log_actions("Added VM", command)
             respond(f"Added {text}.")
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
 
     @app.command("/removevm")
     def remove_vm(ack, respond, command):
@@ -152,7 +152,7 @@ def build_app(cfg):
             log_actions("Removed VM", command)
             respond(f"Removed {text}.")
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
 
         @app.command("/whitelist")
         def whitelist_user(ack, respond, command):
@@ -168,7 +168,7 @@ def build_app(cfg):
                     save_requests(requests)
                 respond(f"Added {text[0]}.")
             else:
-                respond(respond("Invalid input or not authorized to preform this action."))
+                respond("Invalid input or not authorized to preform this action.")
 
         @app.command("/removeuser")
         def remove_user(ack, respond, command):
@@ -180,20 +180,20 @@ def build_app(cfg):
                 log_actions(f"Removed user->({text[0], [text[1]]}) ", command)
                 respond(f"Removed {text}.")
             else:
-                respond(respond("Invalid input or not authorized to preform this action."))
+                respond("Invalid input or not authorized to preform this action.")
 
         @app.command("/register")
         def register_user(ack, respond, command):
             ack()
             text = (command.get("text") or "").strip()
             if command["user_id"] in cfg["admin_ids"]:
-                respond(respond("You're already an admin what more could you want..."))
+                respond("You're already an admin what more could you want...")
             elif command["user_id"] in cfg["white_list"]:
-                respond(respond("User already registered."))
+                respond("User already registered.")
             elif command["channel_id"] in cfg["channel_id"]:
                 requests = load_requests()
                 if command["user_id"] in requests:
-                    respond(respond("Please wait for a VM Admin DM :)"))
+                    respond("Please wait for a VM Admin DM :)")
                 else:
                     requests[command["user_id"]] = [text, command["user_name"]]
                     log_actions(f"Applied for vm type {text}",cfg)
@@ -203,40 +203,36 @@ def build_app(cfg):
     @app.command("/marryme")
     def marryme_command(ack, respond, command):
         ack()
-        text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
-            respond(respond("FUCK YEAHHH"))
+            respond("FUCK YEAHHH")
         elif command["channel_id"] in cfg["channel_id"]:
-            respond(respond("huh?"))
+            respond("huh?")
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
 
     @app.command("/viewrequests")
     def view_requests(ack, respond, command):
         ack()
-        text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
             requests = load_requests()
-            message = ""
             for request in requests:
-                message += f"{requests[request][1]} | {requests[request][0]}\n | {request}\n"
+                respond(f"{requests[request][1]} | {requests[request][0]}\n | {request}\n")
                 log_actions("Viewed requests", command)
-            respond(respond(message))
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
 
     @app.command("/viewlogs")
     def view_logs(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
-            message = ""
             logs = load_logs()
-            for log in logs:
-                message += f"{log}\n"
-            respond(respond(message))
+            for log in enumerate(logs):
+                if log > text:
+                    break
+                respond(f"{log}\n")
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
 
 
     @app.command("/viewvms")
@@ -244,12 +240,37 @@ def build_app(cfg):
         ack()
         text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
-            message = ""
             for vm in cfg["vm_names"]:
-                message += f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)}\n\n"
-            respond(respond(message))
+                respond(f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)}\n\n")
         else:
-            respond(respond("Invalid input or not authorized to preform this action."))
+            respond("Invalid input or not authorized to preform this action.")
+
+
+    @app.command("/promote")
+    def promote_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            respond("User is already an admin")
+        else:
+            cfg["admin_ids"].append(command["user_id"])
+            respond("User is now an admin.")
+            log_actions(f"Promoted {command["user_id"]}", command)
+
+    @app.command("/demote")
+    def demote_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            if text in cfg["admin_ids"]:
+                cfg["admin_ids"].remove(text)
+                respond("User demoted.")
+                log_actions(f"Demoted {command['user_id']}", command)
+            else:
+                respond("User not an admin consider removing from whitelist or slack channel.")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
+
     return app
 
 
