@@ -27,35 +27,35 @@ def get_power_state(compute, rg, vm):
             return code.split("/", 1)[1]
 
 def load_logs():
-    with open('../../vmbackend/logs.txt', 'r') as f:
+    with open('vmbackend/logs.txt', 'r') as f:
         data = f.read()
         return data
 
 
 def save_requests(request):
-    with open('../../vmbackend/requests.json', 'w') as outfile:
+    with open('requests.json', 'w') as outfile:
         json.dump(request, outfile)
 
 def load_requests():
-    with open('../../vmbackend/requests.json', 'r') as json_file:
+    with open('requests.json', 'r') as json_file:
         data = json.load(json_file)
     return data
 
 def log_actions(action, user_name, uid):
-    with open('../../vmbackend/logs.txt', 'a') as log:
+    with open('logs.txt', 'a') as log:
         log.write(f"{action} | Preformed by {user_name} ({uid}) | {datetime.now().strftime("%Y-%m-%d %H:%M")}\n")
 
 def save_config(cfg):
-    with open('../../vmbackend/config.json', 'w') as outfile:
+    with open('config.json', 'w') as outfile:
         json.dump(cfg, outfile)
 
 
 def setup_state():
     try:
-        with open('../../vmbackend/config.json', 'r') as config_file:
+        with open('config.json', 'r') as config_file:
             config = json.load(config_file)
     except FileNotFoundError:
-        with open('../../vmbackend/config.json', 'w') as config_file:
+        with open('config.json', 'w') as config_file:
             template = {
                         "api_domain": "ADD HERE",
                         "vm_names": ["ADD HERE"],
@@ -74,16 +74,16 @@ def setup_state():
             print("Please fill config.json and relaunch.")
             sys.exit()
     try:
-        with open('../../vmbackend/logs.txt', 'r') as log_file:
+        with open('logs.txt', 'r') as log_file:
             pass
     except FileNotFoundError:
-        with open('../../vmbackend/logs.txt', 'w') as log_file:
+        with open('logs.txt', 'w') as log_file:
             log_file.write("")
     try:
-        with open('../../vmbackend/requests.json', 'r') as requests_file:
+        with open('requests.json', 'r') as requests_file:
             pass
     except FileNotFoundError:
-        with open('../../vmbackend/requests.json', 'w') as requests_file:
+        with open('requests.json', 'w') as requests_file:
             requests_file.write("{}")
     return config
 
