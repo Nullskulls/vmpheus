@@ -4,7 +4,20 @@ import sys
 import json
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
-from datetime import datetime
+from datetime import datetime, timezone
+
+def get_uptime(compute, rg, vm):
+    iv = compute.virtual_machines.instance_view(rg, vm)
+    start_time = None
+    for s in iv.statuses:
+        if s.code.startswith("PowerState/") and hasattr(s, "time") and s.time:
+            start_time = s.time
+    if start_time:
+        # Azure gives datetime already timezone-aware
+        delta = datetime.now(timezone.utc) - start_time
+        return delta.total_seconds() // 3600  # hours
+    return None
+
 
 def get_power_state(compute, rg, vm):
     iv = compute.virtual_machines.instance_view(rg, vm)
@@ -14,31 +27,30 @@ def get_power_state(compute, rg, vm):
             return code.split("/", 1)[1]
 
 def load_logs():
-    with open('logs.json', 'r') as f:
-        data = json.load(f)
-        data.splitr("\n")
+    with open('logs.txt', 'r') as f:
+        data = f.read()
         return data
 
 
 def save_requests(request):
-    with open('request.json', 'w') as outfile:
+    with open('requests.json', 'w') as outfile:
         json.dump(request, outfile)
 
 def load_requests():
-    with open('request.json', 'r') as json_file:
+    with open('requests.json', 'r') as json_file:
         data = json.load(json_file)
     return data
 
 def log_actions(action, command):
-    with open('log.txt', 'a') as log:
-        log.write(f"{action} Preformed by {command["user_name"]} ({command["user_id"]}) at {datetime.now}\n")
+    with open('logs.txt', 'a') as log:
+        log.write(f"{action} | Preformed by {command["user_name"]} ({command["user_id"]}) | {datetime.now().strftime("%Y-%m-%d %H:%M")}\n")
 
 def save_config(cfg):
     with open('config.json', 'w') as outfile:
         json.dump(cfg, outfile)
 
 def valid_vm(text, cfg, uid):
-    if uid in cfg["admin_ids"]:
+    if uid in cfg["admin_ids"] and text in cfg["vm_names"]:
         return True
     if text == cfg["white_list"][uid]:
         return True
@@ -154,51 +166,65 @@ def build_app(cfg):
         else:
             respond("Invalid input or not authorized to preform this action.")
 
-        @app.command("/whitelist")
-        def whitelist_user(ack, respond, command):
-            ack()
-            text = (command.get("text") or "").strip()
-            if command["user_id"] in cfg["admin_ids"]:
-                cfg["white_list"][text[0]] = text[1]
-                save_config(cfg)
-                log_actions(f"Added whitelisted user->({text[0], [text[1]]}) ", command)
-                requests = load_requests()
-                if command["user_id"] in requests:
-                    del requests[command["user_id"]]
-                    save_requests(requests)
-                respond(f"Added {text[0]}.")
-            else:
-                respond("Invalid input or not authorized to preform this action.")
+    @app.command("/deauthorize")
+    def deauthorize_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            del cfg["white_list"][text]
+            save_config(cfg)
+            log_actions(f"Deauthorized user {text} ", command)
+            respond(f"Deauthorized user {text} ")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
 
-        @app.command("/removeuser")
-        def remove_user(ack, respond, command):
-            ack()
-            text = (command.get("text") or "").strip()
-            if command["user_id"] in cfg["admin_ids"]:
-                del cfg["white_list"][text]
-                save_config(cfg)
-                log_actions(f"Removed user->({text[0], [text[1]]}) ", command)
-                respond(f"Removed {text}.")
-            else:
-                respond("Invalid input or not authorized to preform this action.")
+    @app.command("/authorize")
+    def whitelist_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip().split(" ")
+        if command["user_id"] in cfg["admin_ids"]:
+            cfg["white_list"][text[0]] = text[1]
+            save_config(cfg)
+            log_actions(f"Added whitelisted user->({text[0], [text[1]]}) ", command)
+            requests = load_requests()
+            if command["user_id"] in requests:
+                del requests[command["user_id"]]
+                save_requests(requests)
+            respond(f"Added {text[0]}.")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
 
-        @app.command("/register")
-        def register_user(ack, respond, command):
-            ack()
-            text = (command.get("text") or "").strip()
-            if command["user_id"] in cfg["admin_ids"]:
-                respond("You're already an admin what more could you want...")
-            elif command["user_id"] in cfg["white_list"]:
-                respond("User already registered.")
-            elif command["channel_id"] in cfg["channel_id"]:
-                requests = load_requests()
-                if command["user_id"] in requests:
-                    respond("Please wait for a VM Admin DM :)")
-                else:
-                    requests[command["user_id"]] = [text, command["user_name"]]
-                    log_actions(f"Applied for vm type {text}",cfg)
-                    save_requests(requests)
-                    respond(f"Applied for vm type {text}.")
+    @app.command("/removeuser")
+    def remove_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            del cfg["white_list"][text]
+            save_config(cfg)
+            log_actions(f"Removed user->({text[0], [text[1]]}) ", command)
+            respond(f"Removed {text}.")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
+
+    @app.command("/vmregister")
+    def register_user(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            respond("You're already an admin what more could you want...")
+        elif command["user_id"] in cfg["white_list"]:
+            respond("User already registered.")
+        elif command["channel_id"] in cfg["channel_id"]:
+            requests = load_requests()
+            if command["user_id"] in requests:
+                respond("Please wait for a VM Admin DM :)")
+            else:
+                requests[command["user_id"]] = [text, command["user_name"]]
+                log_actions(f"Applied for vm type {text}", command)
+                save_requests(requests)
+                respond(f"Applied for vm type {text}.")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
 
     @app.command("/marryme")
     def marryme_command(ack, respond, command):
@@ -216,7 +242,7 @@ def build_app(cfg):
         if command["user_id"] in cfg["admin_ids"]:
             requests = load_requests()
             for request in requests:
-                respond(f"{requests[request][1]} | {requests[request][0]}\n | {request}\n")
+                respond(f"{requests[request][1]} | {requests[request][0]} | {request}\n")
                 log_actions("Viewed requests", command)
         else:
             respond("Invalid input or not authorized to preform this action.")
@@ -224,13 +250,20 @@ def build_app(cfg):
     @app.command("/viewlogs")
     def view_logs(ack, respond, command):
         ack()
-        text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
             logs = load_logs()
-            for log in enumerate(logs):
-                if log > text:
-                    break
-                respond(f"{log}\n")
+            respond(logs)
+        else:
+            respond("Invalid input or not authorized to preform this action.")
+
+    @app.command("/clearlogs")
+    def clear_logs(ack, respond, command):
+        ack()
+        if command["user_id"] in cfg["admin_ids"]:
+            with open("logs.txt", "w") as log:
+                log.write("")
+            log_actions("Clear logs ", command)
+            respond("ai ai capitan")
         else:
             respond("Invalid input or not authorized to preform this action.")
 
@@ -240,8 +273,14 @@ def build_app(cfg):
         ack()
         text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
+            message = ""
             for vm in cfg["vm_names"]:
-                respond(f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)}\n\n")
+                message += f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n"
+            respond(message)
+        elif command["user_id"] in cfg["white_list"]:
+            vm = cfg["white_list"]
+            respond(
+                f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n")
         else:
             respond("Invalid input or not authorized to preform this action.")
 
@@ -251,26 +290,43 @@ def build_app(cfg):
         ack()
         text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
-            respond("User is already an admin")
-        else:
-            cfg["admin_ids"].append(command["user_id"])
-            respond("User is now an admin.")
-            log_actions(f"Promoted {command["user_id"]}", command)
+            if text in cfg["admin_ids"]:
+                respond("User is already an admin")
+            else:
+                cfg["admin_ids"].append(text)
+                save_config(cfg)
+                respond("User is now an admin.")
+                log_actions(f"Promoted {text}", command)
 
     @app.command("/demote")
     def demote_user(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
         if command["user_id"] in cfg["admin_ids"]:
-            if text in cfg["admin_ids"]:
+            if text in cfg["admin_ids"] and text != command["user_id"]:
                 cfg["admin_ids"].remove(text)
+                save_config(cfg)
                 respond("User demoted.")
-                log_actions(f"Demoted {command['user_id']}", command)
+                log_actions(f"Demoted {text}", command)
+            elif text == command["user_id"]:
+                respond("demoting ourselves are we now")
             else:
                 respond("User not an admin consider removing from whitelist or slack channel.")
         else:
             respond("Invalid input or not authorized to preform this action.")
 
+    @app.command("/requestutils")
+    def request_utils(ack, respond, command):
+        ack()
+        text = (command.get("text") or "").strip()
+        if command["user_id"] in cfg["admin_ids"]:
+            respond("just ask eric directly ;-;")
+        elif command["channel_id"] == cfg["channel_id"]:
+            requests = load_requests()
+            requests[command["user_id"]] = "utils"
+            respond("Be a good boy and wait now")
+        else:
+            respond("Invalid input or not authorized to preform this action.")
     return app
 
 
