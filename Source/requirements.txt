@@ -1,2 +1,5 @@
 flask
 gunicorn
+azure-identity==1.17.1
+azure-mgmt-compute==33.0.0
+azure-core==1.30.2
