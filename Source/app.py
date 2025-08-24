@@ -290,13 +290,14 @@ def reject_request():
     log_actions(f"Rejected {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "rejected"}), 200
 
-@app.post("approvevm")
+@app.post("/approvevm")
 def approve_vm():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
     admin_name = data.get("admin_name")
     client_uid = data.get("client_uid")
     vm_name = data.get("vm_name")
+    login = json.loads(data.get("login"))
     requests = load_requests()
     del requests[client_uid]
     save_requests(requests)
