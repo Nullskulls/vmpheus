@@ -48,6 +48,15 @@ def build_app(slack_api_key, slack_signing_secret):
         signing_secret=slack_signing_secret
     )
     auth = get_auth()
+
+    @app.command("vmgreet")
+    def say_hi(ack, body, say):
+        ack()
+        cfg = get_cfg(auth)
+        if body["user_id"] in cfg["admin_ids"]:
+            say("hi ig", channel=cfg["channel_id"])
+
+
     @app.command("/startvm")
     def start_command(ack, respond, command):
         ack()
@@ -355,7 +364,7 @@ def build_app(slack_api_key, slack_signing_secret):
             }
 
             requests.post(
-                f"{auth["domain"]}/requestutils",
+                f"{auth["domain"]}/registerutils",
                 json=payload,
                 headers={"key": auth["key"]}
             )
