@@ -100,7 +100,7 @@ compute = ComputeManagementClient(cred, cfg["azure_subscription_id"])
 app = Flask(__name__)
 
 
-API_KEY = cfg.get("api_key", "changeme123")  # add to your config.json
+API_KEY = cfg.get("api_key", "changeme123")
 
 @app.errorhandler(405)
 def method_not_allowed(e):
@@ -245,8 +245,10 @@ def demote_vm():
 def request_utils():
     data = request.get_json(force=True)
     client_uid = data.get("client_uid")
+    client_name = data.get("client_name")
     requests = load_requests()
-    requests[client_uid] = "utils"
+    requests[client_uid] = ["utils", client_name]
+    save_requests(requests)
     return jsonify({"ok": True, "status": "requested"}), 200
 
 @app.get("/getconfig")

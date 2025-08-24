@@ -203,12 +203,12 @@ def build_app(slack_api_key, slack_signing_secret):
             else:
                 payload = {
                     "client_uid": command["user_id"],
-                    "vm": text,
+                    "vm_type": text,
                     "client_name": command["user_name"]
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/auth",
+                    f"{auth["domain"]}/registervm",
                     json=payload,
                     headers={"key": auth["key"]}
                 )
@@ -232,11 +232,11 @@ def build_app(slack_api_key, slack_signing_secret):
         ack()
         cfg = get_cfg(auth)
         if command["user_id"] in cfg["admin_ids"]:
-            user_requests = requests.get(
+            user_requests = json.loads(requests.get(
                 f"{auth['domain']}/getrequests",
                 headers={"key": auth["key"]},
                 params={}
-            )
+            ).text)["requests"]
             for request in user_requests:
                 respond(f"{user_requests[request][1]} | {user_requests[request][0]} | {request}\n")
 
@@ -292,7 +292,7 @@ def build_app(slack_api_key, slack_signing_secret):
             respond("Invalid input or not authorized to preform this action.")
 
 
-    @app.command("/promote")
+    @app.command("/vmpromote")
     def promote_user(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
@@ -316,7 +316,7 @@ def build_app(slack_api_key, slack_signing_secret):
         else:
             respond("Invalid input or not authorized to preform this action.")
 
-    @app.command("/demote")
+    @app.command("/vmdemote")
     def demote_user(ack, respond, command):
         ack()
         text = (command.get("text") or "").strip()
