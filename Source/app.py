@@ -57,7 +57,7 @@ def setup_state():
     except FileNotFoundError:
         with open('config.json', 'w') as config_file:
             template = {
-                        "api_domain": "ADD HERE",
+                        "api_key": "ADD HERE",
                         "vm_names": ["ADD HERE"],
                         "resource_group": "ADD HERE",
                         "slack_api_key": "ENTER YOUR API KEY HERE",
@@ -99,6 +99,13 @@ compute = ComputeManagementClient(cred, cfg["azure_subscription_id"])
 
 app = Flask(__name__)
 
+
+API_KEY = cfg.get("api_key", "changeme123")  # add to your config.json
+
+@app.before_request
+def require_api_key():
+    if request.headers.get("key") != API_KEY:
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
 
 @app.post('/startvm')
 def start_vm():
