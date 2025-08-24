@@ -27,7 +27,7 @@ def get_power_state(compute, rg, vm):
             return code.split("/", 1)[1]
 
 def load_logs():
-    with open('vmbackend/logs.txt', 'r') as f:
+    with open('logs.txt', 'r') as f:
         data = f.read()
         return data
 
@@ -102,10 +102,14 @@ app = Flask(__name__)
 
 API_KEY = cfg.get("api_key", "changeme123")  # add to your config.json
 
+@app.errorhandler(405)
+def method_not_allowed(e):
+    return jsonify({}), 405
+
 @app.before_request
 def require_api_key():
     if request.headers.get("key") != API_KEY:
-        return jsonify({"ok": False, "error": "unauthorized"}), 401
+        return jsonify({"bitchless": False, "error": "get fucked"}), 401
 
 @app.post('/startvm')
 def start_vm():
@@ -178,12 +182,12 @@ def auth_user():
 @app.post('/registervm')
 def register_vm():
     data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
+    client_uid = data.get("client_uid")
     vm = data.get("vm_type")
-    admin_name = data.get("admin_name")
+    client_name = data.get("client_name")
     requests = load_requests()
-    requests[admin_uid] = [vm, admin_name]
-    log_actions(f"Applied for vm type {vm}", admin_name, admin_uid)
+    requests[client_uid] = [vm, client_name]
+    log_actions(f"Applied for vm type {vm}", client_name, client_uid)
     save_requests(requests)
     return jsonify({"ok": True, "status": "registered"}), 200
 
@@ -198,7 +202,7 @@ def clear_logs():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
     admin_name = data.get("admin_name")
-    with open("../../vmbackend/logs.txt", "w") as log:
+    with open("vmbackend/logs.txt", "w") as log:
         log.write("")
     log_actions("Clear logs ", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "cleared"}), 200
