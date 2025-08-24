@@ -49,7 +49,7 @@ def build_app(slack_api_key, slack_signing_secret):
     )
     auth = get_auth()
 
-    @app.command("vmgreet")
+    @app.command("/vmgreet")
     def say_hi(ack, body, say):
         ack()
         cfg = get_cfg(auth)

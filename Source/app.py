@@ -4,6 +4,14 @@ import json
 from azure.identity import ClientSecretCredential, DefaultAzureCredential
 from azure.mgmt.compute import ComputeManagementClient
 from datetime import datetime, timezone
+from slack_sdk import WebClient
+
+def dm_user(user_id, text):
+    slack = WebClient(token=cfg["slack_bot_token"])
+    im = slack.conversations_open(users=[user_id])
+    channel_id = im["channel"]["id"]
+    slack.chat_postMessage(channel=channel_id, text=text)
+
 
 
 def get_uptime(compute, rg, vm):
@@ -258,6 +266,19 @@ def get_config():
 @app.get("/getrequests")
 def get_requests():
     return jsonify({"ok": True, "requests": load_requests(), "status": "sent"}), 200
+
+@app.post("/approveutils")
+def approve_utils():
+    data = request.get_json(force=True)
+    admin_uid = data.get("admin_uid")
+    admin_name = data.get("admin_name")
+    client_uid = data.get("client_uid")
+    api_key = data.get("api_key")
+    requests = load_requests()
+    del requests[client_uid]
+    save_requests(requests)
+    dm_user(client_uid, f"Congrats, You've received an API key for Shipwrights utils! {api_key}, Please dont lose it :)")
+
 
 if __name__ == '__main__':
     app.run()
