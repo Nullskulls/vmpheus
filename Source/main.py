@@ -350,11 +350,12 @@ def build_app(slack_api_key, slack_signing_secret):
             respond("just ask eric directly ;-;")
         elif command["channel_id"] == cfg["channel_id"]:
             payload = {
-                "client_uid": command["user_id"]
+                "client_uid": command["user_id"],
+                "client_name": command["user_name"]
             }
 
             requests.post(
-                f"{auth["domain"]}/registerutils",
+                f"{auth["domain"]}/requestutils",
                 json=payload,
                 headers={"key": auth["key"]}
             )
