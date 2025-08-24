@@ -277,7 +277,33 @@ def approve_utils():
     requests = load_requests()
     del requests[client_uid]
     save_requests(requests)
+    log_actions(f"Approved {client_uid} for utils", admin_name, admin_uid)
     dm_user(client_uid, f"Congrats, You've received an API key for Shipwrights utils! {api_key}, Please dont lose it :)")
+    return jsonify({"ok": True, "status": "approved"}), 200
+@app.post("/rejectrequest")
+def reject_request():
+    data = request.get_json(force=True)
+    admin_uid = data.get("admin_uid")
+    admin_name = data.get("admin_name")
+    client_uid = data.get("client_uid")
+    dm_user(client_uid, f"Your request has been rejected sorry :/")
+    log_actions(f"Rejected {client_uid}", admin_name, admin_uid)
+    return jsonify({"ok": True, "status": "rejected"}), 200
+
+@app.post("approvevm")
+def approve_vm():
+    data = request.get_json(force=True)
+    admin_uid = data.get("admin_uid")
+    admin_name = data.get("admin_name")
+    client_uid = data.get("client_uid")
+    vm_name = data.get("vm_name")
+    requests = load_requests()
+    del requests[client_uid]
+    save_requests(requests)
+    log_actions(f"Approved {client_uid}", admin_name, admin_uid)
+    cfg["whitelist"][client_uid] = vm_name
+    dm_user(client_uid, f"Congrats you've been approved to use {vm_name}!")
+    return jsonify({"ok": True, "status": "approved"}), 200
 
 
 if __name__ == '__main__':
