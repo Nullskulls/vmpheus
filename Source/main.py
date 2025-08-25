@@ -171,8 +171,9 @@ def build_app(slack_api_key, slack_signing_secret):
         ack()
         cfg = get_cfg(auth)
         text = (command.get("text") or "").strip().split(" ")
-        if is_valid(text[1], cfg, command["user_id"], command):
-            if text[0] == "start":
+
+        if text[0] == "start":
+            if is_valid(text[1], cfg, command["user_id"], command):
                 respond("Starting this bad boy...")
                 payload = {
                     "client_uid": command["user_id"],
@@ -185,7 +186,8 @@ def build_app(slack_api_key, slack_signing_secret):
                     headers={"key": auth["key"]}
                 )
                 respond("VM started.")
-            elif text[0] == "stop":
+        elif text[0] == "stop":
+            if is_valid(text[1], cfg, command["user_id"], command):
                 respond("Sopping this good boy...")
                 payload = {
                     "client_uid": command["user_id"],
@@ -198,7 +200,7 @@ def build_app(slack_api_key, slack_signing_secret):
                     headers={"key": auth["key"]}
                 )
                 respond("VM stopped.")
-        if text[0] == "list":
+        elif text[0] == "list":
             message = json.loads(requests.get(
                 f"{auth['domain']}/api/v1/actions/viewvms/{command['user_id']}",
                 headers={"key": auth["key"]},
@@ -231,9 +233,6 @@ def build_app(slack_api_key, slack_signing_secret):
                         headers={"key": auth["key"]}
                     )
                     respond(f"Applied for vm type {text}.")
-        else:
-            respond("Invalid input.")
-
 
 
     @app.command("/utils")
