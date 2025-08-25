@@ -176,12 +176,11 @@ def build_app(slack_api_key, slack_signing_secret):
                 respond("Starting this bad boy...")
                 payload = {
                     "client_uid": command["user_id"],
-                    "vm": text[1],
-                    "client_name": command["user_name"],
+                    "client_name": command["user_name"]
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/startvm",
+                    f"{auth["domain"]}/api/v1/users/manage/startvm/{text[1]}",
                     json=payload,
                     headers={"key": auth["key"]}
                 )
@@ -190,12 +189,11 @@ def build_app(slack_api_key, slack_signing_secret):
                 respond("Sopping this good boy...")
                 payload = {
                     "client_uid": command["user_id"],
-                    "vm": text[1],
-                    "client_name": command["user_name"],
+                    "client_name": command["user_name"]
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/stopvm",
+                    f"{auth["domain"]}/api/v1/users/manage/stopvm/{text[1]}",
                     json=payload,
                     headers={"key": auth["key"]}
                 )

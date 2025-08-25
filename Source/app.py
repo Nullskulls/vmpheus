@@ -119,7 +119,7 @@ def require_api_key():
     if request.headers.get("key") != API_KEY:
         return jsonify({"bitchless": False, "error": "get fucked"}), 401
 
-@app.post('api/v1/users/manage/startvm/<vm>')
+@app.post('/api/v1/users/manage/startvm/<vm>')
 def start_vm(vm):
     data = request.get_json(force=True)
     client_uid = data.get("client_uid")
@@ -128,7 +128,7 @@ def start_vm(vm):
     log_actions("StartVM ", client_name, client_uid)
     return jsonify({"ok": True, "status": "starting"}), 200
 
-@app.post('api/v1/users/manage/stopvm/<vm>')
+@app.post('/api/v1/users/manage/stopvm/<vm>')
 def stop_vm(vm):
     data = request.get_json(force=True)
     client_uid = data.get("client_uid")
@@ -137,7 +137,7 @@ def stop_vm(vm):
     log_actions("StopVM", client_name, client_uid)
     return jsonify({"ok": True, "status": "stopping"}), 200
 
-@app.post('api/v1/admin/manage/addvm/<vm>')
+@app.post('/api/v1/admin/manage/addvm/<vm>')
 def add_vm(vm):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -147,7 +147,7 @@ def add_vm(vm):
     log_actions("Added VM", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "added"}), 200
 
-@app.post('api/v1/admin/manage/removevm/<vm>')
+@app.post('/api/v1/admin/manage/removevm/<vm>')
 def remove_vm(vm):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -156,7 +156,7 @@ def remove_vm(vm):
     save_config(cfg)
     log_actions("Removed VM", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "removed"}), 200
-@app.post('api/v1/admin/actions/deauth/<client_uid>')
+@app.post('/api/v1/admin/actions/deauth/<client_uid>')
 def deauth_user(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -166,7 +166,7 @@ def deauth_user(client_uid):
     log_actions(f"Deauthorized user {client_uid} ", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "deauthorized"}), 200
 
-@app.post('api/v1/admin/actions/auth/<client_uid>')
+@app.post('/api/v1/admin/actions/auth/<client_uid>')
 def auth_user(client_uid):
     data = request.get_json(force=True)
     vm = data.get("vm")
@@ -181,7 +181,7 @@ def auth_user(client_uid):
         save_requests(requests)
     return jsonify({"ok": True, "status": "authorized"}), 200
 
-@app.post('api/v1/users/<client_id>/request/vm')
+@app.post('/api/v1/users/<client_id>/request/vm')
 def register_vm(client_uid):
     data = request.get_json(force=True)
     vm = data.get("vm_type")
@@ -193,12 +193,12 @@ def register_vm(client_uid):
     return jsonify({"ok": True, "status": "registered"}), 200
 
 
-@app.get('api/v1/data/get/logs')
+@app.get('/api/v1/data/get/logs')
 def get_logs():
     action_logs = load_logs()
     return jsonify({"ok": True, "logs": action_logs, "status": "sent"}), 200
 
-@app.post('api/v1/admin/actions/clearlogs')
+@app.post('/api/v1/admin/actions/clearlogs')
 def clear_logs():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -208,7 +208,7 @@ def clear_logs():
     log_actions("Clear logs ", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "cleared"}), 200
 
-@app.get('api/v1/actions/viewvms/<client_uid>')
+@app.get('/api/v1/actions/viewvms/<client_uid>')
 def view_vms(client_uid):
     if client_uid in cfg["admin_ids"]:
         message = ''
@@ -219,7 +219,7 @@ def view_vms(client_uid):
         message = f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n"
     return jsonify({"ok": True, "vms": message}), 200
 
-@app.post('api/v1/admin/actions/promote/<client_uid>')
+@app.post('/api/v1/admin/actions/promote/<client_uid>')
 def promote_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -229,7 +229,7 @@ def promote_vm(client_uid):
     log_actions(f"Promoted {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "promoted"}), 200
 
-@app.post('api/v1/admin/actions/demote/<client_uid>')
+@app.post('/api/v1/admin/actions/demote/<client_uid>')
 def demote_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -239,7 +239,7 @@ def demote_vm(client_uid):
     log_actions(f"Demoted {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "demoted"}), 200
 
-@app.post('api/v1/users/<client_id>/request/utils')
+@app.post('/api/v1/users/<client_id>/request/utils')
 def request_utils(client_uid):
     data = request.get_json(force=True)
     client_name = data.get("client_name")
@@ -248,7 +248,7 @@ def request_utils(client_uid):
     save_requests(requests)
     return jsonify({"ok": True, "status": "requested"}), 200
 
-@app.get("api/v1/data/getconfig")
+@app.get("/api/v1/data/getconfig")
 def get_config():
     return jsonify({"ok": True, "config": cfg, "status": "sent"}), 200
 
@@ -256,7 +256,7 @@ def get_config():
 def get_requests():
     return jsonify({"ok": True, "requests": load_requests(), "status": "sent"}), 200
 
-@app.post("api/v1/admin/requests/approve/utils/<client_uid>")
+@app.post("/api/v1/admin/requests/approve/utils/<client_uid>")
 def approve_utils():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -269,7 +269,7 @@ def approve_utils():
     log_actions(f"Approved {client_uid} for utils", admin_name, admin_uid)
     dm_user(client_uid, f"Congrats, You've received an API key for Shipwrights utils! {api_key}, Please dont lose it :)")
     return jsonify({"ok": True, "status": "approved"}), 200
-@app.post("api/v1/admin/reject/request/vm/<client_uid>")
+@app.post("/api/v1/admin/reject/request/vm/<client_uid>")
 def reject_request(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -278,7 +278,7 @@ def reject_request(client_uid):
     log_actions(f"Rejected {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "rejected"}), 200
 
-@app.post("api/v1/admin/approve/vm/<client_uid>")
+@app.post("/api/v1/admin/approve/vm/<client_uid>")
 def approve_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
