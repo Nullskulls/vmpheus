@@ -48,7 +48,7 @@ def build_app(slack_api_key, slack_signing_secret):
         signing_secret=slack_signing_secret
     )
     auth = get_auth()
-    @app.command("sr")
+    @app.command("/sr")
     def admin_manage(ack, say, respond, command):
         ack()
         cfg = get_cfg(auth)
@@ -198,39 +198,39 @@ def build_app(slack_api_key, slack_signing_secret):
                     headers={"key": auth["key"]}
                 )
                 respond("VM stopped.")
-            elif text[0] == "list":
-                message = json.loads(requests.get(
-                    f"{auth['domain']}/api/v1/actions/viewvms/{command['user_id']}",
+        if text[0] == "list":
+            message = json.loads(requests.get(
+                f"{auth['domain']}/api/v1/actions/viewvms/{command['user_id']}",
+                headers={"key": auth["key"]},
+                params={}
+            ).text)["vms"]
+            respond(message)
+        elif text[0] == "request":
+            if command["user_id"] in cfg["admin_ids"]:
+                respond("You're already an admin what more could you want...")
+            elif command["user_id"] in cfg["white_list"]:
+                respond("User already registered.")
+            elif command["channel_id"] in cfg["channel_id"]:
+                user_requests = requests.get(
+                    f"{auth['domain']}/getrequests",
                     headers={"key": auth["key"]},
                     params={}
-                ).text)["vms"]
-                respond(message)
-            elif text[0] == "request":
-                if command["user_id"] in cfg["admin_ids"]:
-                    respond("You're already an admin what more could you want...")
-                elif command["user_id"] in cfg["white_list"]:
-                    respond("User already registered.")
-                elif command["channel_id"] in cfg["channel_id"]:
-                    user_requests = requests.get(
-                        f"{auth['domain']}/getrequests",
-                        headers={"key": auth["key"]},
-                        params={}
+                )
+
+                if command["user_id"] in user_requests:
+                    respond("Please wait for a VM Admin DM :)")
+                else:
+                    payload = {
+                        "vm_type": text,
+                        "client_name": command["user_name"]
+                    }
+
+                    requests.post(
+                        f"{auth["domain"]}/api/v1/users/{command["client_id"]}/request/vm",
+                        json=payload,
+                        headers={"key": auth["key"]}
                     )
-
-                    if command["user_id"] in user_requests:
-                        respond("Please wait for a VM Admin DM :)")
-                    else:
-                        payload = {
-                            "vm_type": text,
-                            "client_name": command["user_name"]
-                        }
-
-                        requests.post(
-                            f"{auth["domain"]}/api/v1/users/{command["client_id"]}/request/vm",
-                            json=payload,
-                            headers={"key": auth["key"]}
-                        )
-                        respond(f"Applied for vm type {text}.")
+                    respond(f"Applied for vm type {text}.")
         else:
             respond("Invalid input.")
 
