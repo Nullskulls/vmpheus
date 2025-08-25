@@ -248,7 +248,7 @@ def request_utils(client_uid):
     save_requests(requests)
     return jsonify({"ok": True, "status": "requested"}), 200
 
-@app.get("/api/v1/data/getconfig")
+@app.get("/api/v1/data/get/config")
 def get_config():
     return jsonify({"ok": True, "config": cfg, "status": "sent"}), 200
 

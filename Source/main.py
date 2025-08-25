@@ -6,7 +6,7 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 
 def get_cfg(auth):
     return  json.loads(requests.get(
-                f"{auth['domain']}/getconfig",
+                f"{auth['domain']}/api/v1/data/get/config",
                 headers={"key": auth["key"]},
                 params={}
             ).text)['config']
