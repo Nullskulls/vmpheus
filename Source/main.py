@@ -48,310 +48,197 @@ def build_app(slack_api_key, slack_signing_secret):
         signing_secret=slack_signing_secret
     )
     auth = get_auth()
-
-    @app.command("/vmgreet")
-    def say_hi(ack, body, say):
+    @app.command("sr")
+    def admin_manage(ack, say, respond, command):
         ack()
         cfg = get_cfg(auth)
-        if body["user_id"] in cfg["admin_ids"]:
-            say("hi ig", channel=cfg["channel_id"])
-
-
-    @app.command("/startvm")
-    def start_command(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        text = (command.get("text") or "").strip()
-        if text.lower() == "help":
-            respond("Contact VM admins for support.")
-        elif is_valid(text, cfg, command["user_id"], command):
-            respond("Starting this bad boy...")
-            payload = {
-                "client_uid": command["user_id"],
-                "vm": text,
-                "client_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/startvm",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond("VM started.")
-        else:
-            respond("Invalid input.")
-
-    @app.command("/stopvm")
-    def stop_command(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if text.lower() == "help":
-            respond("Contact VM admins for support.")
-        elif is_valid(text, cfg, command["user_id"], command):
-            respond(f"Sopping this good boy...")
-            payload = {
-                "client_uid": command["user_id"],
-                "vm": text,
-                "client_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/stopvm",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond("VM stopped.")
-        else:
-            respond("Invalid input.")
-
-    @app.command("/addvm")
-    def add_vm(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            payload = {
-                "admin_uid": command["user_id"],
-                "vm": text,
-                "admin_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/addvm",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond(f"Added {text}.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-    @app.command("/removevm")
-    def remove_vm(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            payload = {
-                "admin_uid": command["user_id"],
-                "vm": text,
-                "admin_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/removevm",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond(f"Removed {text}.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-    @app.command("/deauthorize")
-    def deauthorize_user(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            payload = {
-                "admin_uid": command["user_id"],
-                "client_uid": text,
-                "admin_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/deauth",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond(f"Deauthorized user {text} ")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-    @app.command("/authorize")
-    def whitelist_user(ack, respond, command):
-        ack()
         text = (command.get("text") or "").strip().split(" ")
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            payload = {
-                "admin_uid": command["user_id"],
-                "client_uid": text[0],
-                "vm": text[1],
-                "admin_name": command["user_name"],
-            }
-
-            requests.post(
-                f"{auth["domain"]}/auth",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond(f"Added {text[0]}.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-
-    @app.command("/vmregister")
-    def register_user(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            respond("You're already an admin what more could you want...")
-        elif command["user_id"] in cfg["white_list"]:
-            respond("User already registered.")
-        elif command["channel_id"] in cfg["channel_id"]:
-            user_requests = requests.get(
-                f"{auth['domain']}/getrequests",
-                headers={"key": auth["key"]},
-                params={}
-            )
-
-            if command["user_id"] in user_requests:
-                respond("Please wait for a VM Admin DM :)")
-            else:
+        if command["user_id"] not in cfg["admin_ids"]:
+            respond("who r u")
+        if text[0] == "say":
+            message = " ".join(text[1:])
+            say(message)
+        elif text[0] == "vm":
+            if text[1] == "add":
                 payload = {
-                    "client_uid": command["user_id"],
-                    "vm_type": text,
-                    "client_name": command["user_name"]
+                    "admin_uid": command["user_id"],
+                    "admin_name": command["user_name"]
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/registervm",
+                    f"{auth["domain"]}/api/v1/admin/manage/addvm/{text[2]}",
                     json=payload,
                     headers={"key": auth["key"]}
                 )
-                respond(f"Applied for vm type {text}.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
+                respond(f"Added {text[2]}.")
 
-    @app.command("/marryme")
-    def marryme_command(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            respond("to be added if supervisor gives greenlight")
-        elif command["channel_id"] in cfg["channel_id"]:
-            respond("huh?")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
+            elif text[1] == "remove":
+                payload = {
+                    "admin_uid": command["user_id"],
+                    "admin_name": command["user_name"]
+                }
 
-    @app.command("/viewrequests")
-    def view_requests(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
+                requests.post(
+                    f"{auth["domain"]}/api/v1/admin/manage/removevm/{text[2]}",
+                    json=payload,
+                    headers={"key": auth["key"]}
+                )
+                respond(f"Removed {text[2]}.")
+
+            elif text[1] == "deauth":
+                payload = {
+                    "admin_uid": command["user_id"],
+                    "admin_name": command["user_name"]
+                }
+
+                requests.post(
+                    f"{auth["domain"]}/api/v1/admin/actions/deauth/{text[2]}",
+                    json=payload,
+                    headers={"key": auth["key"]}
+                )
+                respond(f"Deauthorized {text[2]}.")
+
+            elif text[1] == "auth":
+                payload = {
+                    "admin_uid": command["user_id"],
+                    "vm": text[3],
+                    "admin_name": command["user_name"]
+                }
+
+                requests.post(
+                    f"{auth["domain"]}/api/v1/admin/actions/auth/{text[2]}",
+                    json=payload,
+                    headers={"key": auth["key"]}
+                )
+                respond(f"authorized {text[2]} for use of {text[3]}.")
+
+        elif text[0] == "logs":
+            logs = json.loads(requests.get(
+                f"{auth['domain']}/api/v1/data/get/logs",
+                headers={"key": auth["key"]},
+                params={}
+            ).text)["logs"]
+            respond(logs)
+
+        elif text[0] == "requests":
             user_requests = json.loads(requests.get(
-                f"{auth['domain']}/getrequests",
+                f"{auth['domain']}/api/v1/data/get/requests",
                 headers={"key": auth["key"]},
                 params={}
             ).text)["requests"]
             for request in user_requests:
                 respond(f"{user_requests[request][1]} | {user_requests[request][0]} | {request}\n")
+        elif text[0] == "remove":
+            if text[1] in cfg["admin_ids"] and text[1] != command["user_id"]:
+                payload = {
+                    "admin_uid": command["user_id"],
+                    "admin_name": command["user_name"],
+                }
 
-        else:
-            respond("Invalid input or not authorized to preform this action.")
+                requests.post(
+                    f"{auth["domain"]}/api/v1/admin/actions/demote/{text[1]}",
+                    json=payload,
+                    headers={"key": auth["key"]}
+                )
+                respond("User demoted.")
+            elif text[1] == command["user_id"]:
+                respond("demoting ourselves are we now")
+            else:
+                respond("User not an admin consider removing from whitelist or slack channel.")
 
-    @app.command("/viewlogs")
-    def view_logs(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            logs = json.loads(requests.get(
-                f"{auth['domain']}/getlogs",
-                headers={"key": auth["key"]},
-                params={}
-            ).text)["logs"]
-            respond(logs)
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-    @app.command("/clearlogs")
-    def clear_logs(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            payload = {
-                "admin_uid": command["user_id"],
-                "admin_name": command["user_name"]
-            }
-
-            requests.post(
-                f"{auth["domain"]}/clearlogs",
-                json=payload,
-                headers={"key": auth["key"]}
-            )
-            respond("ai ai capitan")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-
-    @app.command("/viewvms")
-    def view_vms(ack, respond, command):
-        ack()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"] or command["user_id"] in cfg["white_list"]:
-            message = json.loads(requests.get(
-                f"{auth['domain']}/viewvms",
-                headers={"key": auth["key"]},
-                params={"client_uid": command["user_id"]}
-            ).text)["vms"]
-            respond(message)
-        else:
-            respond("Invalid input or not authorized to preform this action.")
-
-
-    @app.command("/vmpromote")
-    def promote_user(ack, respond, command):
-        ack()
-        text = (command.get("text") or "").strip()
-        cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            if text in cfg["admin_ids"]:
+        elif text[0] == "add":
+            if text[1] in cfg["admin_ids"]:
                 respond("User is already an admin")
             else:
                 payload = {
                     "admin_uid": command["user_id"],
                     "admin_name": command["user_name"],
-                    "client_uid": text
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/promote",
+                    f"{auth["domain"]}/api/v1/admin/actions/promote/{text[1]}",
                     json=payload,
                     headers={"key": auth["key"]}
                 )
                 respond("User is now an admin.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
 
-    @app.command("/vmdemote")
-    def demote_user(ack, respond, command):
+
+
+
+
+    @app.command("/vm")
+    def start_command(ack, respond, command):
         ack()
-        text = (command.get("text") or "").strip()
         cfg = get_cfg(auth)
-        if command["user_id"] in cfg["admin_ids"]:
-            if text in cfg["admin_ids"] and text != command["user_id"]:
+        text = (command.get("text") or "").strip().split(" ")
+        if is_valid(text[1], cfg, command["user_id"], command):
+            if text[0] == "start":
+                respond("Starting this bad boy...")
                 payload = {
-                    "admin_uid": command["user_id"],
-                    "admin_name": command["user_name"],
-                    "client_uid": text
+                    "client_uid": command["user_id"],
+                    "vm": text[1],
+                    "client_name": command["user_name"],
                 }
 
                 requests.post(
-                    f"{auth["domain"]}/demote",
+                    f"{auth["domain"]}/startvm",
                     json=payload,
                     headers={"key": auth["key"]}
                 )
-                respond("User demoted.")
-            elif text == command["user_id"]:
-                respond("demoting ourselves are we now")
-            else:
-                respond("User not an admin consider removing from whitelist or slack channel.")
-        else:
-            respond("Invalid input or not authorized to preform this action.")
+                respond("VM started.")
+            elif text[0] == "stop":
+                respond("Sopping this good boy...")
+                payload = {
+                    "client_uid": command["user_id"],
+                    "vm": text[1],
+                    "client_name": command["user_name"],
+                }
 
-    @app.command("/requestutils")
+                requests.post(
+                    f"{auth["domain"]}/stopvm",
+                    json=payload,
+                    headers={"key": auth["key"]}
+                )
+                respond("VM stopped.")
+            elif text[0] == "list":
+                message = json.loads(requests.get(
+                    f"{auth['domain']}/api/v1/actions/viewvms/{command['user_id']}",
+                    headers={"key": auth["key"]},
+                    params={}
+                ).text)["vms"]
+                respond(message)
+            elif text[0] == "request":
+                if command["user_id"] in cfg["admin_ids"]:
+                    respond("You're already an admin what more could you want...")
+                elif command["user_id"] in cfg["white_list"]:
+                    respond("User already registered.")
+                elif command["channel_id"] in cfg["channel_id"]:
+                    user_requests = requests.get(
+                        f"{auth['domain']}/getrequests",
+                        headers={"key": auth["key"]},
+                        params={}
+                    )
+
+                    if command["user_id"] in user_requests:
+                        respond("Please wait for a VM Admin DM :)")
+                    else:
+                        payload = {
+                            "vm_type": text,
+                            "client_name": command["user_name"]
+                        }
+
+                        requests.post(
+                            f"{auth["domain"]}/api/v1/users/{command["client_id"]}/request/vm",
+                            json=payload,
+                            headers={"key": auth["key"]}
+                        )
+                        respond(f"Applied for vm type {text}.")
+        else:
+            respond("Invalid input.")
+
+
+
+    @app.command("/utils")
     def request_utils(ack, respond, command):
         ack()
         cfg = get_cfg(auth)
@@ -359,12 +246,11 @@ def build_app(slack_api_key, slack_signing_secret):
             respond("just ask eric directly ;-;")
         elif command["channel_id"] == cfg["channel_id"]:
             payload = {
-                "client_uid": command["user_id"],
                 "client_name": command["user_name"]
             }
 
             requests.post(
-                f"{auth["domain"]}/registerutils",
+                f"{auth["domain"]}/api/v1/users/{command["user_id"]}/request/utils",
                 json=payload,
                 headers={"key": auth["key"]}
             )

@@ -119,62 +119,56 @@ def require_api_key():
     if request.headers.get("key") != API_KEY:
         return jsonify({"bitchless": False, "error": "get fucked"}), 401
 
-@app.post('/startvm')
-def start_vm():
+@app.post('api/v1/users/manage/startvm/<vm>')
+def start_vm(vm):
     data = request.get_json(force=True)
     client_uid = data.get("client_uid")
-    vm = data.get("vm")
     client_name = data.get("client_name")
     poller = compute.virtual_machines.begin_start(cfg["resource_group"], vm)
     log_actions("StartVM ", client_name, client_uid)
     return jsonify({"ok": True, "status": "starting"}), 200
 
-@app.post('/stopvm')
-def stop_vm():
+@app.post('api/v1/users/manage/stopvm/<vm>')
+def stop_vm(vm):
     data = request.get_json(force=True)
     client_uid = data.get("client_uid")
-    vm = data.get("vm")
     client_name = data.get("client_name")
     poller = compute.virtual_machines.begin_deallocate(cfg["resource_group"], vm)
     log_actions("StopVM", client_name, client_uid)
     return jsonify({"ok": True, "status": "stopping"}), 200
 
-@app.post('/addvm')
-def add_vm():
+@app.post('api/v1/admin/manage/addvm/<vm>')
+def add_vm(vm):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
-    vm = data.get("vm")
     admin_name = data.get("admin_name")
     cfg["vm_names"].append(vm)
     save_config(cfg)
     log_actions("Added VM", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "added"}), 200
 
-@app.post('/removevm')
-def remove_vm():
+@app.post('api/v1/admin/manage/removevm/<vm>')
+def remove_vm(vm):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
-    vm = data.get("vm")
     admin_name = data.get("admin_name")
     cfg["vm_names"].remove(vm)
     save_config(cfg)
     log_actions("Removed VM", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "removed"}), 200
-@app.post('/deauth')
-def deauth_user():
+@app.post('api/v1/admin/actions/deauth/<client_uid>')
+def deauth_user(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
-    client_uid = data.get("client_uid")
     admin_name = data.get("admin_name")
     del cfg["white_list"][client_uid]
     save_config(cfg)
     log_actions(f"Deauthorized user {client_uid} ", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "deauthorized"}), 200
 
-@app.post('/auth')
-def auth_user():
+@app.post('api/v1/admin/actions/auth/<client_uid>')
+def auth_user(client_uid):
     data = request.get_json(force=True)
-    client_uid = data.get("client_uid")
     vm = data.get("vm")
     admin_uid = data.get("admin_uid")
     admin_name = data.get("admin_name")
@@ -187,10 +181,9 @@ def auth_user():
         save_requests(requests)
     return jsonify({"ok": True, "status": "authorized"}), 200
 
-@app.post('/registervm')
-def register_vm():
+@app.post('api/v1/users/<client_id>/request/vm')
+def register_vm(client_uid):
     data = request.get_json(force=True)
-    client_uid = data.get("client_uid")
     vm = data.get("vm_type")
     client_name = data.get("client_name")
     requests = load_requests()
@@ -200,12 +193,12 @@ def register_vm():
     return jsonify({"ok": True, "status": "registered"}), 200
 
 
-@app.get('/getlogs')
+@app.get('api/v1/data/get/logs')
 def get_logs():
     action_logs = load_logs()
     return jsonify({"ok": True, "logs": action_logs, "status": "sent"}), 200
 
-@app.post('/clearlogs')
+@app.post('api/v1/admin/actions/clearlogs')
 def clear_logs():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -215,9 +208,8 @@ def clear_logs():
     log_actions("Clear logs ", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "cleared"}), 200
 
-@app.get('/viewvms')
-def view_vms():
-    client_uid = request.args.get("client_uid")
+@app.get('api/v1/actions/viewvms/<client_uid>')
+def view_vms(client_uid):
     if client_uid in cfg["admin_ids"]:
         message = ''
         for vm in cfg["vm_names"]:
@@ -227,47 +219,44 @@ def view_vms():
         message = f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n"
     return jsonify({"ok": True, "vms": message}), 200
 
-@app.post('/promote')
-def promote_vm():
+@app.post('api/v1/admin/actions/promote/<client_uid>')
+def promote_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
-    client_uid = data.get("client_uid")
     admin_name = data.get("admin_name")
     cfg["admin_ids"].append(client_uid)
     save_config(cfg)
     log_actions(f"Promoted {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "promoted"}), 200
 
-@app.post('/demote')
-def demote_vm():
+@app.post('api/v1/admin/actions/demote/<client_uid>')
+def demote_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
-    client_uid = data.get("client_uid")
     admin_name = data.get("admin_name")
     cfg["admin_ids"].remove(client_uid)
     save_config(cfg)
     log_actions(f"Demoted {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "demoted"}), 200
 
-@app.post('/requestutils')
-def request_utils():
+@app.post('api/v1/users/<client_id>/request/utils')
+def request_utils(client_uid):
     data = request.get_json(force=True)
-    client_uid = data.get("client_uid")
     client_name = data.get("client_name")
     requests = load_requests()
     requests[client_uid] = ["utils", client_name]
     save_requests(requests)
     return jsonify({"ok": True, "status": "requested"}), 200
 
-@app.get("/getconfig")
+@app.get("api/v1/data/getconfig")
 def get_config():
     return jsonify({"ok": True, "config": cfg, "status": "sent"}), 200
 
-@app.get("/getrequests")
+@app.get("api/v1/data/get/requests")
 def get_requests():
     return jsonify({"ok": True, "requests": load_requests(), "status": "sent"}), 200
 
-@app.post("/approveutils")
+@app.post("api/v1/admin/requests/approve/utils/<client_uid>")
 def approve_utils():
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
@@ -280,22 +269,20 @@ def approve_utils():
     log_actions(f"Approved {client_uid} for utils", admin_name, admin_uid)
     dm_user(client_uid, f"Congrats, You've received an API key for Shipwrights utils! {api_key}, Please dont lose it :)")
     return jsonify({"ok": True, "status": "approved"}), 200
-@app.post("/rejectrequest")
-def reject_request():
+@app.post("api/v1/admin/reject/request/vm/<client_uid>")
+def reject_request(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
     admin_name = data.get("admin_name")
-    client_uid = data.get("client_uid")
-    dm_user(client_uid, f"Your request has been rejected sorry :/")
+    dm_user(client_uid, f"Your request has been rejected sorry :/\nReviewer reason: {data['reason']}    ")
     log_actions(f"Rejected {client_uid}", admin_name, admin_uid)
     return jsonify({"ok": True, "status": "rejected"}), 200
 
-@app.post("/approvevm")
-def approve_vm():
+@app.post("api/v1/admin/approve/vm/<client_uid>")
+def approve_vm(client_uid):
     data = request.get_json(force=True)
     admin_uid = data.get("admin_uid")
     admin_name = data.get("admin_name")
-    client_uid = data.get("client_uid")
     vm_name = data.get("vm_name")
     login = json.loads(data.get("login"))
     requests = load_requests()
@@ -303,7 +290,7 @@ def approve_vm():
     save_requests(requests)
     log_actions(f"Approved {client_uid}", admin_name, admin_uid)
     cfg["whitelist"][client_uid] = vm_name
-    dm_user(client_uid, f"Congrats you've been approved to use {vm_name}!")
+    dm_user(client_uid, f"Congrats you've been approved to use {vm_name}!\nIP Address: {login['ip_address']}\nUsername: {login['username']}\nPassword: {login['password']}")
     return jsonify({"ok": True, "status": "approved"}), 200
 
 
