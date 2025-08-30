@@ -7,11 +7,20 @@ from db import *
 def blacklist(client_uid, cfg, reason):
     cfg["blacklist"][client_uid] = reason
 
-def get_admins(cfg):
-    return cfg["admins"]
+def get_admins():
+    admins = []
+    auth = get_auth()
+    data = json.loads(requests.get(
+        f"{auth['domain']}/api/v1/admins",
+        headers={"key": auth["key"]},
+        params={}
+    ).text)
+    for admin in data["admins"]:
+        admins.append(admin["slackId"])
+    return admins
 
-def is_admin(cfg, command):
-    if command["user_id"] in cfg["admins"]:
+def is_admin(command):
+    if command["user_id"] in get_admins():
         return True
     return False
 
@@ -41,7 +50,7 @@ def setup_state():
                         "socket_id": "ENTER SOCKET ID",
                         "blacklist": ["ADD HERE"],
                         "admins": ["ADD HERE"],
-                        "support_channel": "ADD HERE"
+                        "support_channel": "ADD HERE",
                     }
             print("Please fill config.json and relaunch.")
             sys.exit()
@@ -89,6 +98,8 @@ def get_auth():
 
 setup_ticket_db()
 
+
+
 def build_app(slack_api_key, slack_signing_secret):
     app = App(
         token=slack_api_key,
@@ -99,7 +110,7 @@ def build_app(slack_api_key, slack_signing_secret):
     def admin_manage(ack, say, respond, command):
         ack()
         text = (command.get("text") or "").strip().split(" ")
-        if not is_admin(cfg=cfg, command=command):
+        if not is_admin(command=command):
             respond("Sorry, you are not authorized to do that.")
             return
         if text[0] == "blacklist":
@@ -171,19 +182,23 @@ def build_app(slack_api_key, slack_signing_secret):
                 if len(text) == 2:
                     cfg["channel_id"].remove(command["channel_id"])
                     respond(f"Removed current channel from white list, Channel id -> {text[2]}")
+                    save_config(cfg)
                 else:
                     cfg["channel_id"].remove(text[2])
                     respond(f"Removed channel id -> {text[2]}")
-                save_config(cfg)
+                    save_config(cfg)
             elif text[1] == "support":
                 cfg["support_channel"] = command["channel_id"]
-        save_config(cfg)
-
+                save_config(cfg)
+        elif text[0] == "tickets":
+            if text[1] == "close":
+                close_ticket(text[2])
+                respond("Ticket closed.")
 
 
 
     @app.command("/vm")
-    def start_command(ack, respond, command):
+    def start_command(ack, respond, say, command, client):
         ack()
         text = (command.get("text") or "").strip().split(" ")
         if not is_valid(cfg=cfg, command=command):
@@ -231,7 +246,7 @@ def build_app(slack_api_key, slack_signing_secret):
         elif text[0] == "request":
             if is_valid(cfg=cfg, command=command):
                 payload = {
-                    "vmType": " ".join(text[1:]),
+                    "osType": " ".join(text[1:]),
                     "requestType": "VM_ACCESS"
                 }
 
@@ -244,7 +259,59 @@ def build_app(slack_api_key, slack_signing_secret):
                 if response.status_code == 201:
                     respond(json.loads(response.text)["message"])
         elif text[0] == "help":
-            pass
+            ticket_id = new_id()
+            client_message = client.chat_postMessage(
+                channel=command["channel_id"],
+                text=" ".join(text[1:]).capitalize() or "No details for some reason ;-;"
+            )
+
+            admin_message = client.chat_postMessage(
+                channel=cfg["support_channel"],
+                text=f"{" ".join(text[1:]).title()} from <@{command['user_id']}> ({ticket_id})"
+            )
+            client.chat_postMessage(
+                channel=client_message["channel"],
+                thread_ts=client_message["ts"],
+                text=f"Created ticket, Your ticked id is ({ticket_id}), Someone will respond soon. <@{command['user_id']}>"
+            )
+            create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
+
+    @app.event("message")
+    def handle_replies(body, logger, client, say):
+        event = body.get("event", {})
+        if event.get("subtype"):
+            return
+        if event.get("bot_id"):
+            return
+
+
+        ts = event["ts"]
+        thread_ts = event["thread_ts"]
+        if not ts or thread_ts == ts:
+            return
+
+        channel = event["channel"]
+        text = event.get("text", "")
+        ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
+        if ticket:
+            if ticket["status"] == "open":
+                client.chat_postMessage(
+                    channel=ticket["admin_channel_id"],
+                    thread_ts=ticket["admin_parent_ts"],
+                    text = f"<@{event['user']}>: {text}"
+                )
+            return
+
+        ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
+        if ticket:
+            if ticket["status"] == "open":
+                client.chat_postMessage(
+                    channel=ticket["client_channel_id"],
+                    thread_ts=ticket["client_parent_ts"],
+                    text=text
+                )
+
+
 
 
     @app.command("/utils")
