@@ -2,11 +2,31 @@ import json
 import sys, requests
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
+from db import *
+
+def blacklist(client_uid, cfg, reason):
+    cfg["blacklist"][client_uid] = reason
+
+def get_admins(cfg):
+    return cfg["admins"]
+
+def is_admin(cfg, command):
+    if command["user_id"] in cfg["admins"]:
+        return True
+    return False
+
+def unblacklist(client_uid, cfg):
+    del cfg["blacklist"][client_uid]
+
 
 def save_config(cfg):
     with open('config.json', 'w') as outfile:
         json.dump(cfg, outfile)
 
+def is_blacklisted(client_uid, cfg):
+    if client_uid in cfg["blacklist"]:
+        return True
+    return False
 
 def setup_state():
     try:
@@ -18,7 +38,10 @@ def setup_state():
                         "slack_api_key": "ENTER YOUR API KEY HERE",
                         "slack_signing_secret": "ENTER YOUR SIGNING SECRET HERE",
                         "channel_id": ["ENTER YOUR CHANNEL ID HERE"],
-                        "socket_id": "ENTER SOCKET ID"
+                        "socket_id": "ENTER SOCKET ID",
+                        "blacklist": ["ADD HERE"],
+                        "admins": ["ADD HERE"],
+                        "support_channel": "ADD HERE"
                     }
             print("Please fill config.json and relaunch.")
             sys.exit()
@@ -47,7 +70,7 @@ def valid_channel(cfg, command):
     return False
 
 def is_valid(cfg, command):
-    if valid_channel(cfg, command):
+    if valid_channel(cfg, command) and not is_blacklisted(cfg=cfg, client_uid = command["user_id"]):
         return True
     return False
 
@@ -64,6 +87,8 @@ def get_auth():
                             }, auth_file)
             sys.exit("please fill the file and continue.")
 
+setup_ticket_db()
+
 def build_app(slack_api_key, slack_signing_secret):
     app = App(
         token=slack_api_key,
@@ -74,8 +99,22 @@ def build_app(slack_api_key, slack_signing_secret):
     def admin_manage(ack, say, respond, command):
         ack()
         text = (command.get("text") or "").strip().split(" ")
-        if not is_valid(cfg=cfg, command=command):
+        if not is_admin(cfg=cfg, command=command):
+            respond("Sorry, you are not authorized to do that.")
             return
+        if text[0] == "blacklist":
+
+            if text[1] == "add":
+                blacklist(text[2], cfg, " ".join(text[3:]))
+
+            elif text[1] == "remove":
+                unblacklist([text[2]], cfg)
+
+            elif text[1] == "view":
+                message = ""
+                for person in cfg["blacklist"]:
+                    message += f"{person} :     {cfg["blacklist"][person]}\n"
+                respond(message)
 
         if text[0] == "say":
             message = " ".join(text[1:])
@@ -136,7 +175,9 @@ def build_app(slack_api_key, slack_signing_secret):
                     cfg["channel_id"].remove(text[2])
                     respond(f"Removed channel id -> {text[2]}")
                 save_config(cfg)
-
+            elif text[1] == "support":
+                cfg["support_channel"] = command["channel_id"]
+        save_config(cfg)
 
 
 
@@ -202,6 +243,9 @@ def build_app(slack_api_key, slack_signing_secret):
                 )
                 if response.status_code == 201:
                     respond(json.loads(response.text)["message"])
+        elif text[0] == "help":
+            pass
+
 
     @app.command("/utils")
     def request_utils(ack, respond, command):
