@@ -116,14 +116,13 @@ def get_auth():
             sys.exit("please fill the file and continue.")
 
 
-def handle_replies(body, client, logger):
-    event = body.get("event", {})
+def handle_replies(event, client, logger, cfg):
     if event.get("subtype"):
         return
     if event.get("bot_id"):
         return
-
-
+    if event["user"] in cfg["not_supported"]:
+        return
     ts = event.get("ts")
     thread_ts = event.get("thread_ts")
     if not ts or not thread_ts or thread_ts == ts:
@@ -150,8 +149,7 @@ def handle_replies(body, client, logger):
                 text=text
             )
 
-def handle_message_sent(body, client, cfg):
-    event = body.get("event", {})
+def handle_message_sent(event, client, cfg):
     if event.get("thread_ts") and event["thread_ts"] != event["ts"]:
         return
     if event["channel"] == cfg["public_help"]:
@@ -159,7 +157,7 @@ def handle_message_sent(body, client, cfg):
             client.chat_delete(channel=cfg["public_help"], ts=cfg["holder_ts"])
         cfg["holder_ts"] = client.chat_postMessage(
             channel=cfg["public_help"],
-            text=f"Use `/sos <question>` to get help from verified shipwrights!"
+            text=f"Use `/sos <question>` to get help from verified shipwrights! or use `/complaint <complaint>` to send the shipwrights anonymous complaints!"
         )["ts"]
         save_config(cfg)
     return

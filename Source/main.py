@@ -233,7 +233,7 @@ def build_app(slack_api_key, slack_signing_secret):
             create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
 
     @app.command("/sos")
-    def support(ack, command, client, logger):
+    def support(ack, command, client, logger, body):
         ack()
         text = (command.get("text") or "").strip() or "(no details)"
         ticket_id = new_id()
@@ -289,17 +289,35 @@ def build_app(slack_api_key, slack_signing_secret):
         )
         create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"],
                       cfg["public_support"], admin_message["ts"], text)
+        if cfg["holder_ts"] != "NO TOUCH":
+            client.chat_delete(channel=cfg["public_help"], ts=cfg["holder_ts"])
+        cfg["holder_ts"] = client.chat_postMessage(
+            channel=cfg["public_help"],
+            text=f"Use `/sos <question>` to get help from verified shipwrights! or use `/complaint <complaint>` to send the shipwrights anonymous complaints!"
+        )["ts"]
+        save_config(cfg)
         logger.info(f"[sos:new] client=({command['channel_id']},{client_message['ts']}) "
                     f"admin=({cfg['public_support']},{admin_message['ts']}) id={ticket_id}")
 
+
+
     @app.event("message")
     def handle_messages(body, client, logger):
-        handle_replies(body, client, logger)
-        handle_message_sent(body, client, cfg)
+        event = (body or {}).get("event", {}) or {}
+        handle_replies(event, client, logger, cfg)
+        handle_message_sent(event, client, cfg)
 
 
 
-
+    @app.command("/complaint")
+    def complaint(ack, respond, client, command):
+        ack()
+        text = (command.get("text") or "").strip() or "(no details)"
+        respond("Anonymous complain received.")
+        client.chat_postMessage(
+            channel=cfg["public_support"],
+            text=f"Anonymous complaint: {text}"
+        )
 
 
     @app.action("close_public_ticket")
