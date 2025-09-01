@@ -66,6 +66,14 @@ def find_admin_ticket(channel_id, parent_ts):
         )
         return cur.fetchone()
 
+def find_ticket_id(ticket_id):
+    with connect_db() as con:
+        cur = con.execute(
+            "SELECT * FROM tickets WHERE ticket_id=? LIMIT 1;",
+            (ticket_id,),
+        )
+        return cur.fetchone()
+
 def close_ticket(ticket_id):
     with connect_db() as con:
         con.execute("UPDATE tickets SET status='closed' WHERE ticket_id=?;", (ticket_id,))

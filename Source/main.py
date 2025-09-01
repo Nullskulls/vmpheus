@@ -1,100 +1,7 @@
-import json
-import sys, requests
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from db import *
-
-def blacklist(client_uid, cfg, reason):
-    cfg["blacklist"][client_uid] = reason
-
-def get_admins():
-    admins = []
-    auth = get_auth()
-    data = json.loads(requests.get(
-        f"{auth['domain']}/api/v1/admins",
-        headers={"key": auth["key"]},
-        params={}
-    ).text)
-    for admin in data["admins"]:
-        admins.append(admin["slackId"])
-    return admins
-
-def is_admin(command):
-    if command["user_id"] in get_admins():
-        return True
-    return False
-
-def unblacklist(client_uid, cfg):
-    del cfg["blacklist"][client_uid]
-
-
-def save_config(cfg):
-    with open('config.json', 'w') as outfile:
-        json.dump(cfg, outfile)
-
-def is_blacklisted(client_uid, cfg):
-    if client_uid in cfg["blacklist"]:
-        return True
-    return False
-
-def setup_state():
-    try:
-        with open('config.json', 'r') as config_file:
-            config = json.load(config_file)
-    except FileNotFoundError:
-        with open('config.json', 'w') as config_file:
-            template = {
-                        "slack_api_key": "ENTER YOUR API KEY HERE",
-                        "slack_signing_secret": "ENTER YOUR SIGNING SECRET HERE",
-                        "channel_id": ["ENTER YOUR CHANNEL ID HERE"],
-                        "socket_id": "ENTER SOCKET ID",
-                        "blacklist": ["ADD HERE"],
-                        "admins": ["ADD HERE"],
-                        "support_channel": "ADD HERE",
-                    }
-            print("Please fill config.json and relaunch.")
-            sys.exit()
-    try:
-        with open('logs.txt', 'r') as log_file:
-            pass
-    except FileNotFoundError:
-        with open('logs.txt', 'w') as log_file:
-            log_file.write("")
-    try:
-        with open('requests.json', 'r') as requests_file:
-            pass
-    except FileNotFoundError:
-        with open('requests.json', 'w') as requests_file:
-            requests_file.write("{}")
-    return config
-
-
-def get_cfg(auth):
-    return  setup_state()
-
-
-def valid_channel(cfg, command):
-    if command["channel_id"] in cfg["channel_id"]:
-        return True
-    return False
-
-def is_valid(cfg, command):
-    if valid_channel(cfg, command) and not is_blacklisted(cfg=cfg, client_uid = command["user_id"]):
-        return True
-    return False
-
-
-def get_auth():
-    try:
-        with open('auth.json', 'r') as auth_file:
-            json_data = json.load(auth_file)
-            return json_data
-    except FileNotFoundError:
-        with open('auth.json', 'w') as auth_file:
-            json.dump({"key": "ADD HERE",
-                            "domain": "ADD HERE"
-                            }, auth_file)
-            sys.exit("please fill the file and continue.")
+from helpers import *
 
 setup_ticket_db()
 
@@ -110,7 +17,7 @@ def build_app(slack_api_key, slack_signing_secret):
     def admin_manage(ack, say, respond, command):
         ack()
         text = (command.get("text") or "").strip().split(" ")
-        if not is_admin(command=command):
+        if not is_admin(uid=command["user_id"]):
             respond("Sorry, you are not authorized to do that.")
             return
         if text[0] == "blacklist":
@@ -124,7 +31,7 @@ def build_app(slack_api_key, slack_signing_secret):
             elif text[1] == "view":
                 message = ""
                 for person in cfg["blacklist"]:
-                    message += f"{person} :     {cfg["blacklist"][person]}\n"
+                    message += f"{person} :     {cfg['blacklist'][person]}\n"
                 respond(message)
 
         if text[0] == "say":
@@ -187,8 +94,14 @@ def build_app(slack_api_key, slack_signing_secret):
                     cfg["channel_id"].remove(text[2])
                     respond(f"Removed channel id -> {text[2]}")
                     save_config(cfg)
-            elif text[1] == "support":
+            elif text[1] == "admin_support":
                 cfg["support_channel"] = command["channel_id"]
+                save_config(cfg)
+            elif text[1] == "public_support":
+                cfg["public_support"] = command["channel_id"]
+                save_config(cfg)
+            elif text[1] == "public_help":
+                cfg["public_help"] = command["channel_id"]
                 save_config(cfg)
         elif text[0] == "tickets":
             if text[1] == "close":
@@ -260,57 +173,193 @@ def build_app(slack_api_key, slack_signing_secret):
                     respond(json.loads(response.text)["message"])
         elif text[0] == "help":
             ticket_id = new_id()
+            details = " ".join(text[1:]).capitalize()
             client_message = client.chat_postMessage(
                 channel=command["channel_id"],
-                text=" ".join(text[1:]).capitalize() or "No details for some reason ;-;"
+                text=details or "No details for some reason ;-;"
             )
 
             admin_message = client.chat_postMessage(
                 channel=cfg["support_channel"],
-                text=f"{" ".join(text[1:]).title()} from <@{command['user_id']}> ({ticket_id})"
+                text=f"{details} from <@{command['user_id']}> ({ticket_id})"
             )
             client.chat_postMessage(
                 channel=client_message["channel"],
                 thread_ts=client_message["ts"],
                 text=f"Created ticket, Your ticked id is ({ticket_id}), Someone will respond soon. <@{command['user_id']}>"
             )
+            client.chat_postMessage(
+                channel=command["channel_id"],
+                thread_ts=client_message["ts"],
+                text=f"Controls for ticket {ticket_id}",
+                blocks=[
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"Close ticket {ticket_id}"
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Close Ticket"},
+                            "style": "primary",
+                            "value": ticket_id,
+                            "action_id": "close_ticket"
+                        }
+                    }
+                ]
+            )
+            client.chat_postMessage(
+                channel=cfg["support_channel"],
+                thread_ts=admin_message["ts"],
+                text=f"Controls for ticket {ticket_id}",
+                blocks=[
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": f"Close ticket {ticket_id}"
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Close Ticket"},
+                            "style": "primary",
+                            "value": ticket_id,
+                            "action_id": "close_ticket"
+                        }
+                    }
+                ]
+            )
             create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
 
+    @app.command("/sos")
+    def support(ack, command, client, logger):
+        ack()
+        text = (command.get("text") or "").strip() or "(no details)"
+        ticket_id = new_id()
+        client_message = client.chat_postMessage(
+            channel=command["channel_id"],
+            text=text
+        )
+        admin_message = client.chat_postMessage(
+            channel=cfg["public_support"],
+            text=f"{text} from <@{command['user_id']}>"
+        )
+        client.chat_postMessage(
+            channel=client_message["channel"],
+            thread_ts=client_message["ts"],
+            text=f"Ticket {ticket_id} opened for <@{command['user_id']}>",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"Your query has been received someone will shortly be with you <@{command['user_id']}> ID: `{ticket_id}`"
+                    },
+                    "accessory": {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Close Ticket"},
+                        "style": "primary",
+                        "value": ticket_id,
+                        "action_id": "close_public_ticket"
+                    }
+                }
+            ]
+        )
+        client.chat_postMessage(
+            channel=cfg["public_support"],
+            thread_ts=admin_message["ts"],
+            text=f"Close ticket {ticket_id}",
+            blocks=[
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"Close ticket ID: `{ticket_id}`"
+                    },
+                    "accessory": {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "Close Ticket"},
+                        "style": "primary",
+                        "value": ticket_id,
+                        "action_id": "close_public_ticket"
+                    }
+                }
+            ]
+        )
+        create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"],
+                      cfg["public_support"], admin_message["ts"], text)
+        logger.info(f"[sos:new] client=({command['channel_id']},{client_message['ts']}) "
+                    f"admin=({cfg['public_support']},{admin_message['ts']}) id={ticket_id}")
+
     @app.event("message")
-    def handle_replies(body, logger, client, say):
-        event = body.get("event", {})
-        if event.get("subtype"):
-            return
-        if event.get("bot_id"):
-            return
+    def handle_messages(body, client, logger):
+        handle_replies(body, client, logger)
+        handle_message_sent(body, client, cfg)
 
 
-        ts = event["ts"]
-        thread_ts = event["thread_ts"]
-        if not ts or thread_ts == ts:
-            return
 
-        channel = event["channel"]
-        text = event.get("text", "")
-        ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
+
+
+
+    @app.action("close_public_ticket")
+    def close_public_ticket(body, client, ack):
+        ack()
+        ticket_id = body["actions"][0]["value"]
+        ticket = find_ticket_id(ticket_id)
         if ticket:
-            if ticket["status"] == "open":
-                client.chat_postMessage(
-                    channel=ticket["admin_channel_id"],
-                    thread_ts=ticket["admin_parent_ts"],
-                    text = f"<@{event['user']}>: {text}"
+            if not (is_shipwright(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
+                client.chat_postEphemeral(
+                    channel = body["channel"]["id"],
+                    user = body["user"]["id"],
+                    text = "Not allowed to close this ticket :/"
                 )
+                return
+            if ticket["status"] == "closed":
+                return
+            close_ticket(ticket_id)
+            client.chat_postMessage(
+                channel=ticket["admin_channel_id"],
+                thread_ts=ticket["admin_parent_ts"],
+                text = f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+            client.chat_postMessage(
+                channel=ticket["client_channel_id"],
+                thread_ts=ticket["client_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+        else:
             return
+    @app.action("close_ticket")
+    def close_ticket_action(body, client, ack):
+        ack()
+        ticket_id = body["actions"][0]["value"]
 
-        ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
+        ticket = find_ticket_id(ticket_id)
+
         if ticket:
-            if ticket["status"] == "open":
-                client.chat_postMessage(
-                    channel=ticket["client_channel_id"],
-                    thread_ts=ticket["client_parent_ts"],
-                    text=text
+            if not (is_admin(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
+                client.chat_postEphemeral(
+                    channel = body["channel"]["id"],
+                    user = body["user"]["id"],
+                    text = "Not allowed to preform this action :/"
                 )
-
+                return
+            if ticket["status"] == "closed":
+                return
+            close_ticket(ticket_id)
+            client.chat_postMessage(
+                channel = ticket["admin_channel_id"],
+                thread_ts=ticket["admin_parent_ts"],
+                text = f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+            client.chat_postMessage(
+                channel = ticket["client_channel_id"],
+                thread_ts=ticket["client_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+        else:
+            return
 
 
 
