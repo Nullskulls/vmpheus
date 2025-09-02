@@ -147,10 +147,31 @@ def handle_replies(event, client, logger, cfg):
     ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":
-            client.chat_postMessage(
+            sent = client.chat_postMessage(
                 channel=ticket["client_channel_id"],
                 thread_ts=ticket["client_parent_ts"],
                 text=text
+            )
+            client.chat_postEphemeral(
+                channel = ticket["admin_channel_id"],
+                user = event["user"],
+                thread_ts=ticket["admin_parent_ts"],
+                blocks= [
+                    {
+                        "type": "section",
+                        "text": {
+                            "type": "mrkdwn",
+                            "text": "Message sent."
+                        },
+                        "accessory": {
+                            "type": "button",
+                            "text": {"type": "plain_text", "text": "Delete message"},
+                            "style": "danger",
+                            "value":  json.dumps({"ch": sent["channel"], "ts": sent["ts"]}),
+                            "action_id": "delete_message"
+                        }
+                    }
+                ]
             )
 
 def handle_message_sent(event, client, cfg):

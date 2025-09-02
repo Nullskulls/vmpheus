@@ -303,14 +303,6 @@ def build_app(slack_api_key, slack_signing_secret):
 
 
 
-    @app.event("message")
-    def handle_messages(body, client, logger):
-        event = (body or {}).get("event", {}) or {}
-        handle_replies(event, client, logger, cfg)
-        handle_message_sent(event, client, cfg)
-
-
-
     @app.command("/complaint")
     def complaint(ack, respond, client, command):
         ack()
@@ -320,67 +312,6 @@ def build_app(slack_api_key, slack_signing_secret):
             channel=cfg["public_support"],
             text=f"Anonymous complaint: {text}"
         )
-
-
-    @app.action("close_public_ticket")
-    def close_public_ticket(body, client, ack):
-        ack()
-        ticket_id = body["actions"][0]["value"]
-        ticket = find_ticket_id(ticket_id)
-        if ticket:
-            if not (is_shipwright(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
-                client.chat_postEphemeral(
-                    channel = body["channel"]["id"],
-                    user = body["user"]["id"],
-                    text = "Not allowed to close this ticket :/"
-                )
-                return
-            if ticket["status"] == "closed":
-                return
-            close_ticket(ticket_id)
-            client.chat_postMessage(
-                channel=ticket["admin_channel_id"],
-                thread_ts=ticket["admin_parent_ts"],
-                text = f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
-            )
-            client.chat_postMessage(
-                channel=ticket["client_channel_id"],
-                thread_ts=ticket["client_parent_ts"],
-                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
-            )
-        else:
-            return
-    @app.action("close_ticket")
-    def close_ticket_action(body, client, ack):
-        ack()
-        ticket_id = body["actions"][0]["value"]
-
-        ticket = find_ticket_id(ticket_id)
-
-        if ticket:
-            if not (is_admin(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
-                client.chat_postEphemeral(
-                    channel = body["channel"]["id"],
-                    user = body["user"]["id"],
-                    text = "Not allowed to preform this action :/"
-                )
-                return
-            if ticket["status"] == "closed":
-                return
-            close_ticket(ticket_id)
-            client.chat_postMessage(
-                channel = ticket["admin_channel_id"],
-                thread_ts=ticket["admin_parent_ts"],
-                text = f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
-            )
-            client.chat_postMessage(
-                channel = ticket["client_channel_id"],
-                thread_ts=ticket["client_parent_ts"],
-                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
-            )
-        else:
-            return
-
 
 
     @app.command("/utils")
@@ -400,6 +331,82 @@ def build_app(slack_api_key, slack_signing_secret):
             )
             if response.status_code == 201:
                 respond(json.loads(response.text)["message"])
+
+    @app.action("delete_message")
+    def delete_message(ack, body, client, respond):
+        ack()
+        payload = json.loads(body["actions"][0]["value"])
+        channel = payload["ch"]
+        message_ts = payload["ts"]
+        client.chat_delete(channel=channel, ts=message_ts)
+        respond("Deleted message")
+
+    @app.action("close_public_ticket")
+    def close_public_ticket(body, client, ack):
+        ack()
+        ticket_id = body["actions"][0]["value"]
+        ticket = find_ticket_id(ticket_id)
+        if ticket:
+            if not (is_shipwright(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
+                client.chat_postEphemeral(
+                    channel=body["channel"]["id"],
+                    user=body["user"]["id"],
+                    text="Not allowed to close this ticket :/"
+                )
+                return
+            if ticket["status"] == "closed":
+                return
+            close_ticket(ticket_id)
+            client.chat_postMessage(
+                channel=ticket["admin_channel_id"],
+                thread_ts=ticket["admin_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+            client.chat_postMessage(
+                channel=ticket["client_channel_id"],
+                thread_ts=ticket["client_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+        else:
+            return
+
+    @app.action("close_ticket")
+    def close_ticket_action(body, client, ack):
+        ack()
+        ticket_id = body["actions"][0]["value"]
+
+        ticket = find_ticket_id(ticket_id)
+
+        if ticket:
+            if not (is_admin(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
+                client.chat_postEphemeral(
+                    channel=body["channel"]["id"],
+                    user=body["user"]["id"],
+                    text="Not allowed to preform this action :/"
+                )
+                return
+            if ticket["status"] == "closed":
+                return
+            close_ticket(ticket_id)
+            client.chat_postMessage(
+                channel=ticket["admin_channel_id"],
+                thread_ts=ticket["admin_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+            client.chat_postMessage(
+                channel=ticket["client_channel_id"],
+                thread_ts=ticket["client_parent_ts"],
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+            )
+        else:
+            return
+
+    @app.event("message")
+    def handle_messages(body, client, logger):
+        event = (body or {}).get("event", {}) or {}
+        handle_replies(event, client, logger, cfg)
+        handle_message_sent(event, client, cfg)
+
     return app
 
 
