@@ -130,6 +130,10 @@ def handle_replies(event, client, logger, cfg):
     logger.info(f"[relay] incoming ch={event['channel']} parent={thread_ts}")
     channel = event["channel"]
     text = event.get("text", "")
+    if channel == cfg["public_support"]:
+        if text[0] != '?':
+            return
+    text = text.stripl('?')
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":

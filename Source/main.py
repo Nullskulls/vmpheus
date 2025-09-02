@@ -233,8 +233,10 @@ def build_app(slack_api_key, slack_signing_secret):
             create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
 
     @app.command("/sos")
-    def support(ack, command, client, logger, body):
+    def support(ack, command, client, logger, respond):
         ack()
+        if command["channel_id"] != cfg["public_help"]:
+            respond("Please use this command in the designated channel :/")
         text = (command.get("text") or "").strip() or "(no details)"
         ticket_id = new_id()
         client_message = client.chat_postMessage(
