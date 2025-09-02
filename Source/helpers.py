@@ -133,7 +133,7 @@ def handle_replies(event, client, logger, cfg):
     if channel == cfg["public_support"]:
         if text[0] != '?':
             return
-    text = text.stripl('?')
+    text = text.lstrip('?')
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":
