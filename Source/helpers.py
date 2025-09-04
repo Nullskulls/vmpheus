@@ -1,4 +1,6 @@
-import requests,json, sys
+import tempfile
+
+import requests,json, sys, os
 from db import *
 
 def get_shipwright():
@@ -117,7 +119,7 @@ def get_auth():
 
 
 def handle_replies(event, client, logger, cfg):
-    if event.get("subtype"):
+    if event.get("subtype") and event.get("subtype") != "file_share":
         return
     if event.get("bot_id"):
         return
@@ -131,8 +133,9 @@ def handle_replies(event, client, logger, cfg):
     channel = event["channel"]
     text = event.get("text", "")
     if channel == cfg["public_support"]:
-        if text[0] != '?':
-            return
+        if event.get("subtype") != "file_share":
+            if text[0] != '?':
+                return
     text = text.lstrip('?')
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
@@ -143,6 +146,15 @@ def handle_replies(event, client, logger, cfg):
                 text = f"<@{event['user']}>: {text}"
             )
             save_message(channel, ts, dest["channel"], dest["ts"])
+            media = relay_files(
+                event=event,
+                client=client,
+                dest_channel=ticket["admin_channel_id"],
+                dest_ts=ticket["admin_parent_ts"],
+                bot_token=cfg["slack_api_key"]
+            )
+            for (dest_ch, dest_ts) in media:
+                save_message(channel, ts, dest_ch, dest_ts)
         return
 
     ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
@@ -154,6 +166,15 @@ def handle_replies(event, client, logger, cfg):
                 text=text
             )
             save_message(channel, ts, sent["channel"], sent["ts"])
+            media = relay_files(
+                event=event,
+                client=client,
+                dest_channel=ticket["client_channel_id"],
+                dest_ts=ticket["client_parent_ts"],
+                bot_token=cfg["slack_api_key"]
+            )
+            for (dest_ch, dest_ts) in media:
+                save_message(event["channel"], event["ts"], dest_ch, dest_ts)
             client.chat_postEphemeral(
                 channel = ticket["admin_channel_id"],
                 user = event["user"],
@@ -188,3 +209,43 @@ def handle_message_sent(event, client, cfg):
         )["ts"]
         save_config(cfg)
     return
+
+def relay_files(event, client, dest_channel, dest_ts, bot_token):
+    files = event.get("files") or []
+    results = []
+    for file in files:
+        url = file["url_private_download"] or file["url_private"]
+        if not url:
+            continue
+        tmp_path = None
+        try:
+            with requests.get(url, headers={"Authorization": f"Bearer {bot_token}"}, stream=True, timeout=15) as r:
+                r.raise_for_status()
+                suffix = os.path.splitext(file.get("name") or "")[1] or ""
+                fd, tmp_path = tempfile.mkstemp(suffix=suffix)
+                with os.fdopen(fd, "wb") as out:
+                    for chunk in r.iter_content(chunk_size=1024*1024):
+                        if chunk: out.write(chunk)
+            up = client.files_upload_v2(
+                channel=dest_channel,
+                thread_ts=dest_ts,
+                filename=file.get("name") or "file",
+                file=tmp_path,
+                initial_comment=None
+            )
+            dest_ts = None
+            file_obj = up.get("file", {}) or {}
+            shares = (file_obj.get("shares") or {}).get("shares") or {}
+            if dest_channel in shares and shares[dest_channel]:
+                dest_ts = shares[dest_channel]["ts"]
+            if dest_ts:
+                results.append((dest_channel, dest_ts))
+        finally:
+            if tmp_path and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
+    return results
+
+
