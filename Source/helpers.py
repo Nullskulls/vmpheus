@@ -137,11 +137,12 @@ def handle_replies(event, client, logger, cfg):
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":
-            client.chat_postMessage(
+            dest = client.chat_postMessage(
                 channel=ticket["admin_channel_id"],
                 thread_ts=ticket["admin_parent_ts"],
                 text = f"<@{event['user']}>: {text}"
             )
+            save_message(channel, ts, dest["channel"], dest["ts"])
         return
 
     ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
@@ -152,6 +153,7 @@ def handle_replies(event, client, logger, cfg):
                 thread_ts=ticket["client_parent_ts"],
                 text=text
             )
+            save_message(channel, ts, sent["channel"], sent["ts"])
             client.chat_postEphemeral(
                 channel = ticket["admin_channel_id"],
                 user = event["user"],

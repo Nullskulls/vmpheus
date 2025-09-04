@@ -3,6 +3,20 @@ import sqlite3, pathlib, datetime, uuid
 db_path = pathlib.Path(__file__).parent / "data" / "tickets.db"
 db_path.parent.mkdir(exist_ok=True)
 
+def setup_message_tracking_db():
+    schema = """
+    CREATE TABLE IF NOT EXISTS messages_tracker(
+    source_channel TEXT NOT NULL,
+    source_ts TEXT NOT NULL,
+    dest_channel TEXT NOT NULL,
+    dest_ts TEXT NOT NULL,
+    PRIMARY KEY (source_channel, source_ts)
+        );
+        CREATE INDEX IF NOT EXISTS idx_message_links_dst ON messages_tracker (dest_channel, dest_ts);
+    """
+    with sqlite3.connect(db_path) as conn:
+        conn.executescript(schema)
+
 def setup_ticket_db():
     schema = """
     PRAGMA foreign_keys = ON;
@@ -28,7 +42,23 @@ def setup_ticket_db():
 def connect_db():
     con = sqlite3.connect(db_path)
     con.row_factory = sqlite3.Row
+    con.execute("PRAGMA foreign_keys = ON;")
     return con
+
+def save_message(source_channel, source_ts, dest_channel, dest_ts):
+    with connect_db() as con:
+        con.execute("INSERT OR REPLACE INTO messages_tracker(source_channel, source_ts, dest_channel, dest_ts) VALUES (?,?,?,?)", (source_channel, source_ts, dest_channel, dest_ts))
+
+def find_by_source(source_channel, source_ts):
+    with connect_db() as con:
+        cur = con.execute("SELECT * FROM messages_tracker WHERE source_channel=? AND source_ts=?", (source_channel, source_ts))
+        return cur.fetchone()
+
+def find_by_dest(dest_channel, dest_ts):
+    with connect_db() as con:
+        cur = con.execute("SELECT * FROM messages_tracker WHERE dest_channel=? AND dest_ts=?", (dest_channel, dest_ts))
+        return cur.fetchone()
+
 
 def create_ticket(ticket_id, status, client_uid, client_channel_id,
                   client_parent_ts, admin_channel_id, admin_parent_ts, client_title):

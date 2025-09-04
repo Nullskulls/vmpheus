@@ -4,7 +4,7 @@ from db import *
 from helpers import *
 
 setup_ticket_db()
-
+setup_message_tracking_db()
 
 
 def build_app(slack_api_key, slack_signing_secret):
@@ -407,12 +407,60 @@ def build_app(slack_api_key, slack_signing_secret):
         handle_replies(event, client, logger, cfg)
         handle_message_sent(event, client, cfg)
 
+
+    @app.event("reaction_added")
+    def handle_reaction_added(body, client, ack):
+        ack()
+        event = body.get("event", {}) or {}
+        item = event.get("item", {}) or {}
+        if item.get("type") != "message":
+            return
+        src_channel = item.get("channel")
+        src_ts = item.get("ts")
+        if not src_channel or not src_ts:
+            return
+        reaction = event.get("reaction")
+        if not reaction:
+            return
+        link = find_by_source(src_channel, src_ts)
+        if not link:
+            link = find_by_dest(src_ts, src_ts)
+            if link:
+                dest_channel, dest_ts = link["source_channel"], link["source_ts"]
+            else:
+                return
+        else:
+            dest_channel, dest_ts = link["dest_channel"], link["dest_ts"]
+        client.reactions_add(name=reaction, channel=dest_channel, timestamp=dest_ts)
+
+    @app.event("reaction_removed")
+    def handle_reaction_removed(body, client, ack):
+        ack()
+        event = body.get("event", {}) or {}
+        type = event.get("item", {}) or {}
+        if type.get("type") != "message":
+            return
+        source_channel = type.get("channel")
+        source_ts = type.get("ts")
+        reaction = event.get("reaction")
+        if not (source_channel and source_ts and reaction):
+                return
+        link = find_by_source(source_channel, source_ts)
+        if link:
+            dest_channel, dest_ts = link["dest_channel"], link["dest_ts"]
+        else:
+            link = find_by_dest(source_ts, source_ts)
+            if not link:
+                return
+            dest_channel, dest_ts = link["source_channel"], link["source_ts"]
+        client.reactions_remove(name=reaction, channel=dest_channel, timestamp=dest_ts)
+
+
     return app
 
 
 if __name__ == "__main__":
     cfg = get_cfg(get_auth())
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
-    # Start Socket Mode
     handler = SocketModeHandler(app, cfg["socket_id"])
     handler.start()
