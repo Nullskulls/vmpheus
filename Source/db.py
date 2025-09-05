@@ -80,20 +80,21 @@ def create_ticket(ticket_id, status, client_uid, client_channel_id,
     with connect_db() as con:
         con.execute(sql, params)
 
+def _rows(conn, sql, params=()):
+    cur = conn.execute(sql, params)
+    return [dict(r) for r in cur.fetchall()]
+
 def get_all_tickets():
     with connect_db() as con:
-        cur = con.execute("SELECT * FROM tickets")
-        return cur.fetchall()
+        return _rows(con, "SELECT * FROM tickets")
 
 def get_open_tickets():
     with connect_db() as con:
-        cur = con.execute("SELECT * FROM tickets WHERE status=?", ('open',))
-        return cur.fetchall()
+        return _rows(con, "SELECT * FROM tickets WHERE status=?", ('open',))
 
 def get_closed_tickets():
     with connect_db() as con:
-        cur = con.execute("SELECT * FROM tickets WHERE status=?", ('closed',))
-        return cur.fetchall()
+        return _rows(con, "SELECT * FROM tickets WHERE status=?", ('closed',))
 
 def find_client_ticket(channel_id, parent_ts):
     with connect_db() as con:
