@@ -347,7 +347,7 @@ def build_app(slack_api_key, slack_signing_secret):
         ticket_id = body["actions"][0]["value"]
         ticket = find_ticket_id(ticket_id)
         if ticket:
-            if not (is_shipwright(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
+            if not (is_shipwright(body["user"]["id"]) or is_admin(body["user"]["id"]) or body["user"]["id"] == ticket["client_uid"]):
                 client.chat_postEphemeral(
                     channel=body["channel"]["id"],
                     user=body["user"]["id"],
@@ -357,6 +357,8 @@ def build_app(slack_api_key, slack_signing_secret):
             if ticket["status"] == "closed":
                 return
             close_ticket(ticket_id)
+            client.reactions_add(name="check-check", channel=ticket["admin_channel_id"], timestamp=ticket["admin_parent_ts"])
+            client.reactions_add(name="check-check", channel=ticket["client_channel_id"], timestamp=ticket["client_parent_ts"])
             client.chat_postMessage(
                 channel=ticket["admin_channel_id"],
                 thread_ts=ticket["admin_parent_ts"],
@@ -365,7 +367,7 @@ def build_app(slack_api_key, slack_signing_secret):
             client.chat_postMessage(
                 channel=ticket["client_channel_id"],
                 thread_ts=ticket["client_parent_ts"],
-                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>."
+                text=f"Ticket {ticket_id} was closed by <@{body['user']['id']}>, Messages are no longer received by the shipwrights."
             )
         else:
             return
@@ -388,6 +390,7 @@ def build_app(slack_api_key, slack_signing_secret):
             if ticket["status"] == "closed":
                 return
             close_ticket(ticket_id)
+            client.reactions_add(name= "white_check_mark", channel=ticket["admin_channel_id"], timestamp=ticket["admin_parent_ts"])
             client.chat_postMessage(
                 channel=ticket["admin_channel_id"],
                 thread_ts=ticket["admin_parent_ts"],
