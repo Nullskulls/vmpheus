@@ -424,7 +424,7 @@ def build_app(slack_api_key, slack_signing_secret):
             return
         link = find_by_source(src_channel, src_ts)
         if not link:
-            link = find_by_dest(src_ts, src_ts)
+            link = find_by_dest(src_channel, src_ts)
             if link:
                 dest_channel, dest_ts = link["source_channel"], link["source_ts"]
             else:

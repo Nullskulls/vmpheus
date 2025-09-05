@@ -131,7 +131,7 @@ def handle_replies(event, client, logger, cfg):
         return
     logger.info(f"[relay] incoming ch={event['channel']} parent={thread_ts}")
     channel = event["channel"]
-    text = event.get("text", "")
+    text = event.get("text", "").strip(' ')
     if channel == cfg["public_support"]:
         if event.get("subtype") != "file_share":
             if text[0] != '?':
@@ -160,12 +160,39 @@ def handle_replies(event, client, logger, cfg):
     ticket = find_admin_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":
-            sent = client.chat_postMessage(
-                channel=ticket["client_channel_id"],
-                thread_ts=ticket["client_parent_ts"],
-                text=text
-            )
-            save_message(channel, ts, sent["channel"], sent["ts"])
+            if len(text) > 0:
+                sent = client.chat_postMessage(
+                    channel=ticket["client_channel_id"],
+                    thread_ts=ticket["client_parent_ts"],
+                    text=text
+                )
+                save_message(channel, ts, sent["channel"], sent["ts"])
+                client.chat_postEphemeral(
+                    channel=ticket["admin_channel_id"],
+                    user=event["user"],
+                    thread_ts=ticket["admin_parent_ts"],
+                    blocks=[
+                        {
+                            "type": "section",
+                            "text": {
+                                "type": "mrkdwn",
+                                "text": "Message sent."
+                            },
+                            "accessory": {
+                                "type": "button",
+                                "text": {"type": "plain_text", "text": "Delete message"},
+                                "style": "danger",
+                                "value": json.dumps({"ch": sent["channel"], "ts": sent["ts"]}),
+                                "action_id": "delete_message"
+                            }
+                        }
+                    ]
+                )
+            else:
+                sent ={
+                    "channel": ticket["client_channel_id"],
+                    "ts": ticket["client_parent_ts"]
+                }
             media = relay_files(
                 event=event,
                 client=client,
@@ -175,27 +202,7 @@ def handle_replies(event, client, logger, cfg):
             )
             for (dest_ch, dest_ts) in media:
                 save_message(event["channel"], event["ts"], dest_ch, dest_ts)
-            client.chat_postEphemeral(
-                channel = ticket["admin_channel_id"],
-                user = event["user"],
-                thread_ts=ticket["admin_parent_ts"],
-                blocks= [
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": "Message sent."
-                        },
-                        "accessory": {
-                            "type": "button",
-                            "text": {"type": "plain_text", "text": "Delete message"},
-                            "style": "danger",
-                            "value":  json.dumps({"ch": sent["channel"], "ts": sent["ts"]}),
-                            "action_id": "delete_message"
-                        }
-                    }
-                ]
-            )
+
 
 def handle_message_sent(event, client, cfg):
     if event.get("thread_ts") and event["thread_ts"] != event["ts"]:
