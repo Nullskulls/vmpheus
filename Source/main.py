@@ -37,7 +37,8 @@ def build_app(slack_api_key, slack_signing_secret):
         if text[0] == "say":
             message = " ".join(text[1:])
             say(message)
-
+        elif text[0] == "ping":
+            say("<!channel>")
         elif text[0] == "admin":
             if text[1] == "add":
                 payload = {
