@@ -1,114 +1,10 @@
 from flask import Flask, jsonify, request
-import sys
-import json
-from azure.identity import ClientSecretCredential, DefaultAzureCredential
-from azure.mgmt.compute import ComputeManagementClient
-from datetime import datetime, timezone
-from slack_sdk import WebClient
-
-def dm_user(user_id, text):
-    slack = WebClient(token=cfg["slack_bot_token"])
-    im = slack.conversations_open(users=[user_id])
-    channel_id = im["channel"]["id"]
-    slack.chat_postMessage(channel=channel_id, text=text)
-
-
-
-def get_uptime(compute, rg, vm):
-    iv = compute.virtual_machines.instance_view(rg, vm)
-    start_time = None
-    for s in iv.statuses:
-        if s.code.startswith("PowerState/") and hasattr(s, "time") and s.time:
-            start_time = s.time
-    if start_time:
-        # Azure gives datetime already timezone-aware
-        delta = datetime.now(timezone.utc) - start_time
-        return delta.total_seconds() // 3600  # hours
-    return None
-
-
-def get_power_state(compute, rg, vm):
-    iv = compute.virtual_machines.instance_view(rg, vm)
-    for s in iv.statuses:
-        code = getattr(s, "code", "")
-        if code.startswith("PowerState/"):
-            return code.split("/", 1)[1]
-
-def load_logs():
-    with open('logs.txt', 'r') as f:
-        data = f.read()
-        return data
-
-
-def save_requests(request):
-    with open('requests.json', 'w') as outfile:
-        json.dump(request, outfile)
-
-def load_requests():
-    with open('requests.json', 'r') as json_file:
-        data = json.load(json_file)
-    return data
-
-def log_actions(action, user_name, uid):
-    with open('logs.txt', 'a') as log:
-        log.write(f"{action} | Preformed by {user_name} ({uid}) | {datetime.now().strftime("%Y-%m-%d %H:%M")}\n")
-
-def save_config(cfg):
-    with open('config.json', 'w') as outfile:
-        json.dump(cfg, outfile)
-
-
-def setup_state():
-    try:
-        with open('config.json', 'r') as config_file:
-            config = json.load(config_file)
-    except FileNotFoundError:
-        with open('config.json', 'w') as config_file:
-            template = {
-                        "api_key": "ADD HERE",
-                        "vm_names": ["ADD HERE"],
-                        "resource_group": "ADD HERE",
-                        "slack_api_key": "ENTER YOUR API KEY HERE",
-                        "slack_signing_secret": "ENTER YOUR SIGNING SECRET HERE",
-                        "azure_tenant_id": "ENTER YOUR TENANT ID HERE",
-                        "azure_client_id": "ENTER YOUR CLIENT ID HERE",
-                        "azure_client_secret": "ENTER YOUR SECRET HERE",
-                        "azure_subscription_id": "ENTER YOUR SUBSCRIPTION ID HERE",
-                        "admin_ids": ["ENTER YOUR ADMIN IDS HERE"],
-                        "white_list": {"ADD UID": "ADD HERE VM NAME"},
-                        "channel_id": "ENTER YOUR CHANNEL ID HERE",
-                        "socket_id": "ENTER SOCKET ID"
-                    }
-            print("Please fill config.json and relaunch.")
-            sys.exit()
-    try:
-        with open('logs.txt', 'r') as log_file:
-            pass
-    except FileNotFoundError:
-        with open('logs.txt', 'w') as log_file:
-            log_file.write("")
-    try:
-        with open('requests.json', 'r') as requests_file:
-            pass
-    except FileNotFoundError:
-        with open('requests.json', 'w') as requests_file:
-            requests_file.write("{}")
-    return config
-
-cfg = setup_state()
-
-cred = ClientSecretCredential(
-        tenant_id=cfg["azure_tenant_id"],
-        client_id=cfg["azure_client_id"],
-        client_secret=cfg["azure_client_secret"]
-    )
-
-compute = ComputeManagementClient(cred, cfg["azure_subscription_id"])
-
+from helpers import get_auth
+from db import close_ticket, get_closed_tickets, get_all_tickets, get_open_tickets
+import subprocess
+auth = get_auth()
 app = Flask(__name__)
 
-
-API_KEY = cfg.get("api_key", "changeme123")
 
 @app.errorhandler(405)
 def method_not_allowed(e):
@@ -116,183 +12,35 @@ def method_not_allowed(e):
 
 @app.before_request
 def require_api_key():
-    if request.headers.get("key") != API_KEY:
+    if request.headers.get("key") != auth["key"]:
         return jsonify({"bitchless": False, "error": "get fucked"}), 401
 
-@app.post('/api/v1/users/manage/startvm/<vm>')
-def start_vm(vm):
-    data = request.get_json(force=True)
-    client_uid = data.get("client_uid")
-    client_name = data.get("client_name")
-    poller = compute.virtual_machines.begin_start(cfg["resource_group"], vm)
-    log_actions("StartVM ", client_name, client_uid)
-    return jsonify({"ok": True, "status": "starting"}), 200
+@app.post("api/v1/tickets/close/<ticket_id>")
+def collapse_ticket(ticket_id):
+    close_ticket(ticket_id)
+    return jsonify({"ok": True})
 
-@app.post('/api/v1/users/manage/stopvm/<vm>')
-def stop_vm(vm):
-    data = request.get_json(force=True)
-    client_uid = data.get("client_uid")
-    client_name = data.get("client_name")
-    poller = compute.virtual_machines.begin_deallocate(cfg["resource_group"], vm)
-    log_actions("StopVM", client_name, client_uid)
-    return jsonify({"ok": True, "status": "stopping"}), 200
+@app.get("api/v1/tickets/open")
+def get_o_tickets():
+    return jsonify({"tickets": get_open_tickets(), "ok": True})
 
-@app.post('/api/v1/admin/manage/addvm/<vm>')
-def add_vm(vm):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    cfg["vm_names"].append(vm)
-    save_config(cfg)
-    log_actions("Added VM", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "added"}), 200
+@app.get("api/v1/tickets/all")
+def get_a_tickets():
+    return jsonify({"tickets": get_all_tickets(), "ok": True})
 
-@app.post('/api/v1/admin/manage/removevm/<vm>')
-def remove_vm(vm):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    cfg["vm_names"].remove(vm)
-    save_config(cfg)
-    log_actions("Removed VM", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "removed"}), 200
-@app.post('/api/v1/admin/actions/deauth/<client_uid>')
-def deauth_user(client_uid):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    del cfg["white_list"][client_uid]
-    save_config(cfg)
-    log_actions(f"Deauthorized user {client_uid} ", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "deauthorized"}), 200
+@app.get("api/v1/tickets/closed")
+def get_c_tickets():
+    return jsonify({"tickets": get_closed_tickets(), "ok": True})
 
-@app.post('/api/v1/admin/actions/auth/<client_uid>')
-def auth_user(client_uid):
-    data = request.get_json(force=True)
-    vm = data.get("vm")
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    cfg["white_list"][client_uid] = vm
-    save_config(cfg)
-    log_actions(f"Added whitelisted user->({client_uid, vm}) ", admin_name, admin_uid)
-    requests = load_requests()
-    if client_uid in requests:
-        del requests[client_uid]
-        save_requests(requests)
-    return jsonify({"ok": True, "status": "authorized"}), 200
-
-@app.post('/api/v1/users/<client_id>/request/vm')
-def register_vm(client_uid):
-    data = request.get_json(force=True)
-    vm = data.get("vm_type")
-    client_name = data.get("client_name")
-    requests = load_requests()
-    requests[client_uid] = [vm, client_name]
-    log_actions(f"Applied for vm type {vm}", client_name, client_uid)
-    save_requests(requests)
-    return jsonify({"ok": True, "status": "registered"}), 200
-
-
-@app.get('/api/v1/data/get/logs')
-def get_logs():
-    action_logs = load_logs()
-    return jsonify({"ok": True, "logs": action_logs, "status": "sent"}), 200
-
-@app.post('/api/v1/admin/actions/clearlogs')
-def clear_logs():
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    with open("vmbackend/logs.txt", "w") as log:
-        log.write("")
-    log_actions("Clear logs ", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "cleared"}), 200
-
-@app.get('/api/v1/actions/viewvms/<client_uid>')
-def view_vms(client_uid):
-    if client_uid in cfg["admin_ids"]:
-        message = ''
-        for vm in cfg["vm_names"]:
-            message += f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n"
-    else:
-        vm = cfg["white_list"][client_uid]
-        message = f"{vm} | {get_power_state(compute, cfg["resource_group"], vm)} | {get_uptime(compute, cfg["resource_group"], vm)}\n\n"
-    return jsonify({"ok": True, "vms": message}), 200
-
-@app.post('/api/v1/admin/actions/promote/<client_uid>')
-def promote_vm(client_uid):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    cfg["admin_ids"].append(client_uid)
-    save_config(cfg)
-    log_actions(f"Promoted {client_uid}", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "promoted"}), 200
-
-@app.post('/api/v1/admin/actions/demote/<client_uid>')
-def demote_vm(client_uid):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    cfg["admin_ids"].remove(client_uid)
-    save_config(cfg)
-    log_actions(f"Demoted {client_uid}", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "demoted"}), 200
-
-@app.post('/api/v1/users/<client_id>/request/utils')
-def request_utils(client_uid):
-    data = request.get_json(force=True)
-    client_name = data.get("client_name")
-    requests = load_requests()
-    requests[client_uid] = ["utils", client_name]
-    save_requests(requests)
-    return jsonify({"ok": True, "status": "requested"}), 200
-
-@app.get("/api/v1/data/get/config")
-def get_config():
-    return jsonify({"ok": True, "config": cfg, "status": "sent"}), 200
-
-@app.get("/api/v1/data/get/requests")
-def get_requests():
-    return jsonify({"ok": True, "requests": load_requests(), "status": "sent"}), 200
-
-@app.post("/api/v1/admin/requests/approve/utils/<client_uid>")
-def approve_utils():
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    client_uid = data.get("client_uid")
-    api_key = data.get("api_key")
-    requests = load_requests()
-    del requests[client_uid]
-    save_requests(requests)
-    log_actions(f"Approved {client_uid} for utils", admin_name, admin_uid)
-    dm_user(client_uid, f"Congrats, You've received an API key for Shipwrights utils! {api_key}, Please dont lose it :)")
-    return jsonify({"ok": True, "status": "approved"}), 200
-@app.post("/api/v1/admin/reject/request/vm/<client_uid>")
-def reject_request(client_uid):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    dm_user(client_uid, f"Your request has been rejected sorry :/\nReviewer reason: {data['reason']}    ")
-    log_actions(f"Rejected {client_uid}", admin_name, admin_uid)
-    return jsonify({"ok": True, "status": "rejected"}), 200
-
-@app.post("/api/v1/admin/approve/vm/<client_uid>")
-def approve_vm(client_uid):
-    data = request.get_json(force=True)
-    admin_uid = data.get("admin_uid")
-    admin_name = data.get("admin_name")
-    vm_name = data.get("vm_name")
-    login = json.loads(data.get("login"))
-    requests = load_requests()
-    del requests[client_uid]
-    save_requests(requests)
-    log_actions(f"Approved {client_uid}", admin_name, admin_uid)
-    cfg["whitelist"][client_uid] = vm_name
-    dm_user(client_uid, f"Congrats you've been approved to use {vm_name}!\nIP Address: {login['ip_address']}\nUsername: {login['username']}\nPassword: {login['password']}")
-    return jsonify({"ok": True, "status": "approved"}), 200
-
-
+@app.get("api/v1/health")
+def get_health():
+    result = subprocess.run(
+        ["systemctl", "--user", "is-active", "vmpheus"],
+        capture_output=True, text=True
+    )
+    return jsonify({
+                    "api": True,
+                    "bot": result.stdout.strip() == "active"
+                    })
 if __name__ == '__main__':
     app.run()

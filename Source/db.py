@@ -80,6 +80,21 @@ def create_ticket(ticket_id, status, client_uid, client_channel_id,
     with connect_db() as con:
         con.execute(sql, params)
 
+def get_all_tickets():
+    with connect_db() as con:
+        cur = con.execute("SELECT * FROM tickets")
+        return cur.fetchall()
+
+def get_open_tickets():
+    with connect_db() as con:
+        cur = con.execute("SELECT * FROM tickets WHERE status=?", ('open',))
+        return cur.fetchall()
+
+def get_closed_tickets():
+    with connect_db() as con:
+        cur = con.execute("SELECT * FROM tickets WHERE status=?", ('closed',))
+        return cur.fetchall()
+
 def find_client_ticket(channel_id, parent_ts):
     with connect_db() as con:
         cur = con.execute(
