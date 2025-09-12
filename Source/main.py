@@ -247,7 +247,9 @@ def build_app(slack_api_key, slack_signing_secret):
         profile_url = profile.get("image_192")
         client_message = client.chat_postMessage(
             channel=command["channel_id"],
-            text=text
+            text=text,
+            username=display_username,
+            icon_url=profile_url
         )
         admin_message = client.chat_postMessage(
             channel=cfg["public_support"],
