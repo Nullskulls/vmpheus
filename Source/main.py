@@ -2,6 +2,7 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from db import *
 from helpers import *
+import threading, thread
 
 setup_ticket_db()
 setup_message_tracking_db()
@@ -465,6 +466,8 @@ def build_app(slack_api_key, slack_signing_secret):
 
 
 if __name__ == "__main__":
+    t = threading.Thread(target=thread.notify, daemon=True)
+    t.start()
     cfg = get_cfg(get_auth())
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
     handler = SocketModeHandler(app, cfg["socket_id"])
