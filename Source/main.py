@@ -129,18 +129,6 @@ def build_app(slack_api_key, slack_signing_secret):
                     respond(json.loads(response.text)["error"])
                 elif response.status_code == 200:
                     respond(json.loads(response.text)["message"])
-        elif text[0] == "stop":
-            if is_valid(cfg=cfg, command=command):
-                response = requests.post(
-                    f"{auth["domain"]}/api/v1/vms/{text[1]}",
-                    json={"action": "stop"},
-                    headers={"key": auth["key"],
-                             "uid": command["user_id"]}
-                )
-                if response.status_code == 403:
-                    respond(json.loads(response.text)["error"])
-                elif response.status_code == 200:
-                    respond(json.loads(response.text)["message"])
         elif text[0] == "list":
             if is_valid(cfg=cfg, command=command):
                 respond("Calling Microsoft... :3 :loll:")
@@ -251,9 +239,13 @@ def build_app(slack_api_key, slack_signing_secret):
             username=display_username,
             icon_url=profile_url
         )
+        link = client.chat_getPermalink(
+            channel=command["channel_id"],
+            message_ts=client_message["ts"]
+        )
         admin_message = client.chat_postMessage(
             channel=cfg["public_support"],
-            text=f"{text} from <@{command['user_id']}>",
+            text=f"{text} from <@{command['user_id']}> <{link["permalink"]}|thread>",
             username=f"{display_username} | Ticket",
             icon_url=profile_url
         )
