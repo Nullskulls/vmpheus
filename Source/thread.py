@@ -22,9 +22,12 @@ def notify():
         message = "*STALE TICKETS*\n"
         tickets = stale_tickets()
         for ticket in tickets:
-            link = client.chat_getPermalink(channel=ticket["admin_channel_id"], message_ts=ticket["admin_parent_ts"])
-            message += f"{i}- <{link['permalink']}|{ticket["client_title"]}> by <@{ticket["client_uid"]}>\n"
-            i+=1
+            try:
+                link = client.chat_getPermalink(channel=ticket["admin_channel_id"], message_ts=ticket["admin_parent_ts"])
+                message += f"{i}- <{link['permalink']}|{ticket["client_title"]}> by <@{ticket["client_uid"]}>\n"
+                i+=1
+            except Exception as e:
+                print(f"Message linking error : {e}")
         client.chat_postMessage(
             channel = cfg["public_support"],
             text = message

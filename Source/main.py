@@ -470,3 +470,7 @@ if __name__ == "__main__":
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
     handler = SocketModeHandler(app, cfg["socket_id"])
     handler.start()
+    try:
+        t = threading.Thread(target=thread.notify, daemon=True).start()
+    except Exception as e:
+        print(f"Thread failed: {e}")
