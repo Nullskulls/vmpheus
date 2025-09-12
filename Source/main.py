@@ -238,15 +238,22 @@ def build_app(slack_api_key, slack_signing_secret):
         ack()
         if command["channel_id"] != cfg["public_help"]:
             respond("Please use this command in the designated channel :/")
+            return
         text = (command.get("text") or "").strip() or "(no details)"
         ticket_id = new_id()
+        resp = client.users_info(user=command["user_id"])
+        profile = resp["user"]["profile"]
+        display_username = profile.get("display_name") or profile.get("real_name") or "No username found."
+        profile_url = profile.get("image_192")
         client_message = client.chat_postMessage(
             channel=command["channel_id"],
             text=text
         )
         admin_message = client.chat_postMessage(
             channel=cfg["public_support"],
-            text=f"{text} from <@{command['user_id']}>"
+            text=f"{text} from <@{command['user_id']}>",
+            username=f"{display_username} | Ticket",
+            icon_url=profile_url
         )
         client.chat_postMessage(
             channel=client_message["channel"],

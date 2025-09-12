@@ -19,20 +19,10 @@ vmpheus was a bot created for hackclub summer of making to help in the project r
 
 <h4> Slack bot commands: </h4>
 
-* StartVM 
-* StopVM
-* AddVM
-* RemoveVM
-* Authorize
-* VmRegister
-* ViewRequests
-* ViewLogs
-* ViewVms
-* VmPromote
-* VmDemote
-* Deauthorize
-* ClearLogs
-* RequestUtils
+* `/sr` for admin commands
+* `/sos` for staff support
+* `/utils` to request a utils api key
+* `/vm` for vm control
 <br>
 <h5>These commands were made with ease of management and usability in mind!
 

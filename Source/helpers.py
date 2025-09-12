@@ -140,10 +140,16 @@ def handle_replies(event, client, logger, cfg):
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
         if ticket["status"] == "open":
+            resp = client.users_info(user=event["user"])
+            profile = resp["user"]["profile"]
+            display_username = profile.get("display_name") or profile.get("real_name") or "No username found."
+            profile_url = profile.get("image_512")
             dest = client.chat_postMessage(
                 channel=ticket["admin_channel_id"],
                 thread_ts=ticket["admin_parent_ts"],
-                text = f"<@{event['user']}>: {text}"
+                text = f"<@{event['user']}>: {text}",
+                username=display_username,
+                icon_url=profile_url
             )
             save_message(channel, ts, dest["channel"], dest["ts"])
             media = relay_files(
