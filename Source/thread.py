@@ -2,7 +2,6 @@ from db import get_all_tickets
 from helpers import get_cfg
 from slack_sdk import WebClient
 import time
-
 import datetime
 
 def stale_tickets():
@@ -23,7 +22,7 @@ def notify():
         message = "*STALE TICKETS*\n"
         tickets = stale_tickets()
         for ticket in tickets:
-            link = client.chat_getPermalink(channel=ticket["client_channel_id"], message_ts=ticket["client_parent_ts"])
+            link = client.chat_getPermalink(channel=ticket["admin_channel_id"], message_ts=ticket["admin_parent_ts"])
             message += f"{i}- <{link['permalink']}|{ticket["client_title"]}> by <@{ticket["client_uid"]}>\n"
             i+=1
         client.chat_postMessage(
