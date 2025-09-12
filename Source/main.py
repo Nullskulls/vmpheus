@@ -466,8 +466,6 @@ def build_app(slack_api_key, slack_signing_secret):
 
 
 if __name__ == "__main__":
-    t = threading.Thread(target=thread.notify, daemon=True)
-    t.start()
     cfg = get_cfg(get_auth())
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
     handler = SocketModeHandler(app, cfg["socket_id"])
