@@ -19,13 +19,15 @@ def notify():
     cfg = get_cfg("")
     client = WebClient(token=cfg["slack_api_key"])
     while True:
-        message = ""
+        i=1
+        message = "*STALE TICKETS*\n"
         tickets = stale_tickets()
         for ticket in tickets:
             link = client.chat_getPermalink(channel=ticket["client_channel_id"], message_ts=ticket["client_parent_ts"])
-            message += f"<{link['permalink']}|stale ticket>\n"
+            message += f"{i}- <{link['permalink']}|{ticket["client_title"]}> by <@{ticket["client_uid"]}>\n"
+            i+=1
         client.chat_postMessage(
             channel = cfg["public_support"],
             text = message
         )
-        time.sleep(172800)
+        time.sleep(86400)
