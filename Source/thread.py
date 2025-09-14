@@ -21,6 +21,13 @@ def notify():
         i=1
         message = "*STALE TICKETS*\n"
         tickets = stale_tickets()
+        if tickets is None:
+            client.chat_postMessage(
+                channel=cfg["public_support"],
+                text="No stale tickets congrats team! :agadance:",
+            )
+            time.sleep(86400)
+            pass
         for ticket in tickets:
             try:
                 link = client.chat_getPermalink(channel=ticket["admin_channel_id"], message_ts=ticket["admin_parent_ts"])
