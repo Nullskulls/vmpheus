@@ -21,7 +21,7 @@ def notify():
         i=1
         message = "*STALE TICKETS*\n"
         tickets = stale_tickets()
-        if tickets is None:
+        if not tickets:
             client.chat_postMessage(
                 channel=cfg["public_support"],
                 text="No stale tickets congrats team! :agadance:",
