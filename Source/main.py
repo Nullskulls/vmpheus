@@ -469,10 +469,10 @@ def build_app(slack_api_key, slack_signing_secret):
 
 if __name__ == "__main__":
     cfg = get_cfg()
-    try:
-        t = threading.Thread(target=thread.notify, daemon=False).start()
-    except Exception as e:
-        print(f"Thread failed: {e}")
+    #try:
+    #    t = threading.Thread(target=thread.notify, daemon=False).start()
+    #except Exception as e:
+    #    print(f"Thread failed: {e}")
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
     handler = SocketModeHandler(app, cfg["socket_id"])
     handler.start()
