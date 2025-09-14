@@ -151,7 +151,6 @@ def build_app(slack_api_key, slack_signing_secret):
                 payload = {
                     "osType": " ".join(text[1:]),
                     "requestType": "VM_ACCESS",
-                    "userName": get_display_name(command["user_id"], client)
                 }
 
                 response = requests.post(
@@ -222,6 +221,8 @@ def build_app(slack_api_key, slack_signing_secret):
                 ]
             )
             create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
+        else:
+            respond("Invalid Arguments")
 
     @app.command("/sos")
     def support(ack, command, client, logger, respond):
