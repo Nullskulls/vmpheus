@@ -321,7 +321,7 @@ def build_app(slack_api_key, slack_signing_secret):
     @app.command("/utils")
     def request_utils(ack, respond, command, client):
         ack()
-        cfg = get_cfg(auth)
+        cfg = get_cfg()
         if is_valid(cfg=cfg, command=command):
             payload = {
                 "requestType": "UTILS_API_KEY",
@@ -470,7 +470,7 @@ def build_app(slack_api_key, slack_signing_secret):
 if __name__ == "__main__":
     cfg = get_cfg()
     try:
-        t = threading.Thread(target=thread.notify, daemon=True).start()
+        t = threading.Thread(target=thread.notify, daemon=False).start()
     except Exception as e:
         print(f"Thread failed: {e}")
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
