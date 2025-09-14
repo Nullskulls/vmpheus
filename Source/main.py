@@ -150,7 +150,8 @@ def build_app(slack_api_key, slack_signing_secret):
             if is_valid(cfg=cfg, command=command):
                 payload = {
                     "osType": " ".join(text[1:]),
-                    "requestType": "VM_ACCESS"
+                    "requestType": "VM_ACCESS",
+                    "userName": get_display_name(command["user_id"], client)
                 }
 
                 response = requests.post(
@@ -318,12 +319,13 @@ def build_app(slack_api_key, slack_signing_secret):
 
 
     @app.command("/utils")
-    def request_utils(ack, respond, command):
+    def request_utils(ack, respond, command, client):
         ack()
         cfg = get_cfg(auth)
         if is_valid(cfg=cfg, command=command):
             payload = {
-                "requestType": "UTILS_API_KEY"
+                "requestType": "UTILS_API_KEY",
+                "userName": get_display_name(command["user_id"], client)
             }
 
             response = requests.post(
@@ -466,7 +468,7 @@ def build_app(slack_api_key, slack_signing_secret):
 
 
 if __name__ == "__main__":
-    cfg = get_cfg(get_auth())
+    cfg = get_cfg()
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
     handler = SocketModeHandler(app, cfg["socket_id"])
     handler.start()

@@ -15,7 +15,7 @@ def stale_tickets():
     return stale_ticket_list
 
 def notify():
-    cfg = get_cfg("")
+    cfg = get_cfg()
     client = WebClient(token=cfg["slack_api_key"])
     while True:
         i=1

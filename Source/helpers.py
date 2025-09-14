@@ -3,6 +3,14 @@ import tempfile
 import requests,json, sys, os
 from db import *
 
+def get_display_name(uid, client):
+    response = client.users_info(user=uid)
+    if response["ok"]:
+        profile = response["profile"]
+        return profile["display_name"] or profile.get("real_name")
+    return uid
+
+
 def get_shipwright():
     shipwrights = []
     auth = get_auth()
@@ -90,7 +98,7 @@ def setup_state():
     return config
 
 
-def get_cfg(auth):
+def get_cfg():
     return  setup_state()
 
 
