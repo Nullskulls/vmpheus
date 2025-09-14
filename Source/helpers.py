@@ -3,12 +3,6 @@ import tempfile
 import requests,json, sys, os
 from db import *
 
-def get_display_name(uid, client):
-    response = client.users_info(user=uid)
-    if response["ok"]:
-        profile = response["profile"]
-        return profile["display_name"] or profile.get("real_name")
-    return uid
 
 
 def get_shipwright():

@@ -161,66 +161,6 @@ def build_app(slack_api_key, slack_signing_secret):
                 )
                 if response.status_code == 201:
                     respond(json.loads(response.text)["message"])
-        elif text[0] == "help":
-            ticket_id = new_id()
-            details = " ".join(text[1:]).capitalize()
-            client_message = client.chat_postMessage(
-                channel=command["channel_id"],
-                text=details or "No details for some reason ;-;"
-            )
-
-            admin_message = client.chat_postMessage(
-                channel=cfg["support_channel"],
-                text=f"{details} from <@{command['user_id']}> ({ticket_id})"
-            )
-            client.chat_postMessage(
-                channel=client_message["channel"],
-                thread_ts=client_message["ts"],
-                text=f"Created ticket, Your ticked id is ({ticket_id}), Someone will respond soon. <@{command['user_id']}>"
-            )
-            client.chat_postMessage(
-                channel=command["channel_id"],
-                thread_ts=client_message["ts"],
-                text=f"Controls for ticket {ticket_id}",
-                blocks=[
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"Close ticket {ticket_id}"
-                        },
-                        "accessory": {
-                            "type": "button",
-                            "text": {"type": "plain_text", "text": "Close Ticket"},
-                            "style": "primary",
-                            "value": ticket_id,
-                            "action_id": "close_ticket"
-                        }
-                    }
-                ]
-            )
-            client.chat_postMessage(
-                channel=cfg["support_channel"],
-                thread_ts=admin_message["ts"],
-                text=f"Controls for ticket {ticket_id}",
-                blocks=[
-                    {
-                        "type": "section",
-                        "text": {
-                            "type": "mrkdwn",
-                            "text": f"Close ticket {ticket_id}"
-                        },
-                        "accessory": {
-                            "type": "button",
-                            "text": {"type": "plain_text", "text": "Close Ticket"},
-                            "style": "primary",
-                            "value": ticket_id,
-                            "action_id": "close_ticket"
-                        }
-                    }
-                ]
-            )
-            create_ticket(ticket_id, 'open', command["user_id"], command["channel_id"], client_message["ts"], cfg["support_channel"], admin_message["ts"], " ".join(text[1:]))
         else:
             respond("Invalid Arguments")
 
@@ -326,7 +266,6 @@ def build_app(slack_api_key, slack_signing_secret):
         if is_valid(cfg=cfg, command=command):
             payload = {
                 "requestType": "UTILS_API_KEY",
-                "userName": get_display_name(command["user_id"], client)
             }
 
             response = requests.post(
