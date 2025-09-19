@@ -135,7 +135,7 @@ def handle_replies(event, client, logger, cfg):
     channel = event["channel"]
     text = event.get("text").strip(' ')
     if channel == cfg["public_support"]:
-        if text and text[0] != '?':
+        if not text or text[0] != '?':
             return
     text = text.lstrip('?')
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
