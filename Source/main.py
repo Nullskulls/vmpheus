@@ -403,7 +403,6 @@ def build_app(slack_api_key, slack_signing_secret):
             dest_channel, dest_ts = link["source_channel"], link["source_ts"]
         client.reactions_remove(name=reaction, channel=dest_channel, timestamp=dest_ts)
 
-
     return app
 
 

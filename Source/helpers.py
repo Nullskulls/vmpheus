@@ -133,11 +133,10 @@ def handle_replies(event, client, logger, cfg):
         return
     logger.info(f"[relay] incoming ch={event['channel']} parent={thread_ts}")
     channel = event["channel"]
-    text = event.get("text", "").strip(' ')
+    text = event.get("text").strip(' ')
     if channel == cfg["public_support"]:
-        if event.get("subtype") != "file_share":
-            if text[0] != '?':
-                return
+        if text and text[0] != '?':
+            return
     text = text.lstrip('?')
     ticket = find_client_ticket(channel_id=channel, parent_ts=thread_ts)
     if ticket:
