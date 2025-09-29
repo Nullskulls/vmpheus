@@ -2,11 +2,10 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from db import *
 from helpers import *
-import threading, thread
+import threading, ticket_monitor 
 
 setup_ticket_db()
 setup_message_tracking_db()
-
 
 def build_app(slack_api_key, slack_signing_secret):
     app = App(
