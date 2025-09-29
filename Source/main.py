@@ -408,7 +408,7 @@ def build_app(slack_api_key, slack_signing_secret):
 if __name__ == "__main__":
     cfg = get_cfg()
     #try:
-    #    t = threading.Thread(target=thread.notify, daemon=False).start()
+    #    t = threading.Thread(target=ticket_monitor.notify, daemon=True).start()
     #except Exception as e:
     #    print(f"Thread failed: {e}")
     app = build_app(cfg["slack_api_key"], cfg["slack_signing_secret"])
